@@ -1,0 +1,292 @@
+---
+title: "PSM test"
+author: "Matt Alvarez-Nissen"
+date: "June 25, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(MatchIt)
+library(gridExtra)
+library(tableone)
+library(broom)
+library(infer)
+
+# Data
+## neighborhood traits data
+nbr_traits_09_file <- "./SGC/master_investments_09.csv"
+
+# Parameters
+## Source functions
+source('psm_funcs.R')
+
+## Path for final covariate table
+cov_table_path <- "./SGC/cov_table.csv"
+
+## Path for matched data LA
+psm_matched_la_path <- "./SGC/psm_matched_la.csv"
+
+## Path for matched data SF Bay
+psm_matched_sf_path <- "./SGC/psm_matched_sf.csv"
+
+## Path for matched data Fresno
+psm_matched_fresno_path <- "./SGC/psm_matched_fresno.csv"
+```
+
+# NOTE: CODE/FINAL CSV STILL USES DUMMY MOBILITY MEASUREMENT
+# Read in 2009 investments
+```{r}
+neighborhood_test <- read_csv(nbr_traits_09_file)
+```
+
+# Filter by location
+```{r}
+sf_neighborhood <-
+  neighborhood_test %>% 
+  filter(location == "SF_Bay")
+
+la_neighborhood <-
+  neighborhood_test %>% 
+  filter(location == "LA")
+
+fresno_neighborhood <-
+  neighborhood_test %>% 
+  filter(location == "Fresno")
+```
+
+# NOTE: SKIP IF ALREADY DONE (I.E. FINAL TABLE AVAILABLE)
+# Identify covariates
+```{r, eval=FALSE}
+# create covariate table to test for lowest absolute standard difference
+cov_table <-
+  tibble(
+    case = c("base_case", "base_case_plus", "raw", "raw_plus", "pct_pnt", "pct_pnt_plus", "pct", "pct_plus", "base_raw", "base_raw_plus", "base_pct_pnt", "base_pct_pnt_plus", "base_pct", "base_pct_plus"),
+    cov =
+      list(
+        c("pct_nonwhi_09", "med_inc_09", "pct_h_rent_09", "med_rent_09", "pct_college_09"),
+        c("pct_nonwhi_09", "pct_pov_09", "med_inc_09", "pct_housing_vac_09", "pct_h_rent_09", "med_rent_09", "pct_college_09"),
+        c("pct_pnt_nonwhi_chng", "med_inc_chng", "pct_pnt_h_rent_chng", "med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_pnt_nonwhi_chng", "pct_pnt_pov_chng", "med_inc_chng", "pct_pnt_vac_chng", "pct_pnt_h_rent_chng", "med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_pnt_nonwhi_chng", "pct_med_inc_chng", "pct_pnt_h_rent_chng", "pct_med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_pnt_nonwhi_chng", "pct_pnt_pov_chng", "pct_med_inc_chng", "pct_pnt_vac_chng", "pct_pnt_h_rent_chng", "pct_med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_pop_nonwhi_chng", "pct_med_inc_chng", "pct_h_rent_chng", "pct_med_rent_chng", "pct_pop_college_chng"),
+        c("pct_pop_nonwhi_chng", "pct_pop_pov_chng", "pct_med_inc_chng", "pct_vac_chng", "pct_h_rent_chng", "pct_med_rent_chng", "pct_pop_college_chng"),
+        c("pct_nonwhi_09", "med_inc_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pnt_nonwhi_chng", "med_inc_chng", "pct_pnt_h_rent_chng", "med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_nonwhi_09", "pct_pov_09", "med_inc_09", "pct_housing_vac_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pnt_nonwhi_chng", "pct_pnt_pov_chng", "med_inc_chng", "pct_pnt_vac_chng", "pct_pnt_h_rent_chng", "med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_nonwhi_09", "med_inc_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pnt_nonwhi_chng", "pct_med_inc_chng", "pct_pnt_h_rent_chng", "pct_med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_nonwhi_09", "pct_pov_09", "med_inc_09", "pct_housing_vac_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pnt_nonwhi_chng", "pct_pnt_pov_chng", "pct_med_inc_chng", "pct_pnt_vac_chng", "pct_pnt_h_rent_chng", "pct_med_rent_chng", "pct_pnt_college_chng"),
+        c("pct_nonwhi_09", "med_inc_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pop_nonwhi_chng", "pct_med_inc_chng", "pct_h_rent_chng", "pct_med_rent_chng", "pct_pop_college_chng"),
+        c("pct_nonwhi_09", "pct_pov_09", "med_inc_09", "pct_housing_vac_09", "pct_h_rent_09", "med_rent_09", "pct_college_09", "pct_pop_nonwhi_chng", "pct_pop_pov_chng", "pct_med_inc_chng", "pct_vac_chng", "pct_h_rent_chng", "pct_med_rent_chng", "pct_pop_college_chng")
+      )
+  )
+```
+
+# NOTE: SKIP IF FINAL TABLE AVAILABLE
+# Find the Mean Absolute Standard Difference across regions
+# (to determine the best overall covariate balance)
+
+## Create helper to find AASD for each pairing
+```{r}
+abs_std_diff_finder <- function(data, cov) {
+  # Run PSM
+  matched_table <- psm_results(data, cov)
+  
+  # Find AASD from PSM, print as double
+  aasd(matched_table, cov)
+}
+```
+
+```{r, eval=FALSE}
+# create a list of results for each covariate grouping in LA
+diffs <- c()
+for (i in 1:as.double(count(cov_table))) {
+  diffs <-
+    rbind(diffs, abs_std_diff_finder(la_neighborhood, deframe(cov_table$cov[i])))
+   # c(diffs, abs_std_diff_finder(la_neighborhood, deframe(cov_table$cov[i])))
+}
+
+# add results on to cov_table
+cov_table <-
+  cov_table %>%
+  bind_cols(diffs) %>%
+  rename(abs_std_diff_la = n)
+
+# Repeat the process for SF Bay
+diffs <- c()
+for (i in 1:as.double(count(cov_table))) {
+  diffs <-
+    rbind(diffs, abs_std_diff_finder(sf_neighborhood, deframe(cov_table$cov[i])))
+}
+
+# add results on to cov_table
+cov_table <-
+  cov_table %>%
+  bind_cols(diffs) %>%
+  rename(abs_std_diff_sf = n)
+
+# Repeat the process for Fresno
+diffs <- c()
+for (i in 1:as.double(count(cov_table))) {
+  diffs <-
+    rbind(diffs, abs_std_diff_finder(fresno_neighborhood, deframe(cov_table$cov[i])))
+}
+
+# add results on to cov_table
+cov_table <-
+  cov_table %>%
+  bind_cols(diffs) %>%
+  rename(abs_std_diff_fresno = n)
+
+# Convert cov column to character
+cov_table <-
+  cov_table %>%
+  mutate(
+    cov = as.character(cov),
+    cov = str_remove(cov, "^c\\("),
+    cov = str_remove(cov, "\\)$")
+  )
+
+# write final cov_table to .csv for later use
+cov_table %>%
+  write_csv(cov_table_path)
+```
+
+# RESUME HERE IF FINAL cov_table AVAILABLE
+# Read in "cov_table"
+```{r}
+cov_table <- read_csv(cov_table_path)
+```
+
+## Calculate mean ASD and find the minimum (best covariate balance)
+```{r}
+# find the min ASD
+cov_table %>% 
+  mutate(
+    mean_asd = (abs_std_diff_la + abs_std_diff_sf + abs_std_diff_fresno) / 3 
+  ) %>% 
+  arrange(mean_asd) %>% 
+  select(case, mean_asd, everything()) %>% 
+  head(5)
+
+# The "raw" covariate sample produces on average the lowest ASD
+## The next, from smallest to largest, are base_case_plus, pct, base_pct_pnt, 
+## & base_raw
+
+# Extract the list of covariates for use in further analysis
+## Use base case plus
+neighborhood_cov <-
+  cov_table %>% 
+  # filter to "raw" (or covariate list of choice)
+  filter(case == "base_case_plus") %>% 
+  mutate(cov = str_remove_all(cov, '\\"')) %>% 
+  # select for list of covariates
+  select(cov) %>% 
+  pull()
+
+# Convert to proper form for analysis
+neighborhood_cov <- unlist(strsplit(neighborhood_cov, split = ", "))
+```
+
+# LOS ANGELES
+--------------------------------------------------------------------------------
+# Conduct PSM analysis
+```{r}
+# Run PSM function
+psm_results_la <- psm_results(la_neighborhood, neighborhood_cov)
+```
+
+# Investigate PSM results
+```{r}
+# Print area of common support plot
+common_support_plot(la_neighborhood, neighborhood_cov)
+
+# Print covariate balance plots
+covariate_balance_plot(psm_results_la, neighborhood_cov)
+```
+
+# Write results to CSV
+```{r}
+psm_results_la %>% 
+  # turn row name into a column
+  rownames_to_column() %>% 
+  # match on original df
+  inner_join(la_neighborhood) %>% 
+  # move around the order of the df
+  select(GEOID:n_invest, everything()) %>% 
+  select(GEOID, investment, distance, everything()) %>% 
+  # arrange by distance (i.e. propensity score) to put matched pairs together
+  arrange(distance) %>% 
+  # write to final CSV
+  write_csv(psm_matched_la_path)
+```
+
+# SF BAY AREA
+--------------------------------------------------------------------------------
+# Conduct PSM analysis
+```{r}
+# Run PSM function
+psm_results_sf <- psm_results(sf_neighborhood, neighborhood_cov)
+```
+
+# Investigate PSM results
+```{r}
+# Print area of common support plot
+common_support_plot(sf_neighborhood, neighborhood_cov)
+
+# Print covariate balance plots
+covariate_balance_plot(psm_results_sf, neighborhood_cov)
+```
+
+# Write results to CSV
+```{r}
+psm_results_sf %>% 
+  # turn row name into a column
+  rownames_to_column() %>% 
+  # match on original df
+  inner_join(sf_neighborhood) %>% 
+  # move around the order of the df
+  select(GEOID:n_invest, everything()) %>% 
+  select(GEOID, investment, distance, everything()) %>% 
+  # arrange by distance (i.e. propensity score) to put matched pairs together
+  arrange(distance) %>% 
+  # write to final CSV
+  write_csv(psm_matched_sf_path)
+```
+
+# FRESNO
+--------------------------------------------------------------------------------
+# Conduct PSM analysis
+```{r}
+# Run PSM function
+psm_results_fresno <- psm_results(fresno_neighborhood, neighborhood_cov)
+```
+
+# Investigate PSM results
+```{r}
+# Print area of common support plot
+common_support_plot(fresno_neighborhood, neighborhood_cov)
+
+# Print covariate balance plots
+covariate_balance_plot(psm_results_fresno, neighborhood_cov)
+```
+
+# Write results to CSV
+```{r}
+psm_results_fresno %>% 
+  # turn row name into a column
+  rownames_to_column() %>% 
+  # match on original df
+  inner_join(fresno_neighborhood) %>% 
+  # move around the order of the df
+  select(GEOID:n_invest, everything()) %>% 
+  select(GEOID, investment, distance, everything()) %>% 
+  # arrange by distance (i.e. propensity score) to put matched pairs together
+  arrange(distance) %>% 
+  # write to final CSV
+  write_csv(psm_matched_fresno_path)
+```
