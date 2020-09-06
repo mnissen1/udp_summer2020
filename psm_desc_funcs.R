@@ -215,13 +215,14 @@ noah_bar_plot <- function(area_stats, area_psm) {
     select(investment, perc_noah_tot_change, perc_noah_nolihtc_change) %>% 
     pivot_longer(cols = c(perc_noah_tot_change, perc_noah_nolihtc_change)) %>% 
     ggplot(aes(x = name, y = value, fill = investment)) +
-    geom_col(position = "dodge") +
+    geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
     scale_x_discrete(labels = c("No LIHTC", "Total")) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     scale_fill_discrete(labels = c("No Investment", "Investment")) +
     guides(fill = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "bottom") +
     labs(
-      title = "NOAH Change (2009 - 2016)",
+      title = "NOAH change (2009 - 2016)",
       subtitle =
         str_glue(
           "Area: {area}", 
@@ -229,12 +230,12 @@ noah_bar_plot <- function(area_stats, area_psm) {
         ),
       x = NULL,
       y = "% change",
-      fill = "Investment"
+      fill = NULL
     )
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/noah_{area}.png",
+      "./SGC/visualizations/bar_plots/noah_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = noah_bar)
@@ -322,7 +323,7 @@ outmigration_time <- function(area_stats, area_psm) {
   # Save to PNG 
   path <-
     str_glue(
-      "./SGC/visualizations/outmigration_time_{area}.png",
+      "./SGC/visualizations/time_series/outmigration_time_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = time_plot)
@@ -349,26 +350,29 @@ outmigration_bar <- function(area_stats, area_psm) {
     group_by(investment, type) %>% 
     summarise(migration_rate = mean(migration_rate)) %>% 
     ggplot(aes(x = type, y = migration_rate, fill = investment)) +
-    geom_col(position = "dodge") +
+    geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
     scale_x_discrete(
       labels = c("All", "Low Income", "Low Income Renters", "Renters")
     ) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     scale_fill_discrete(labels = c("No Investment", "Investment")) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "bottom") +
     labs(
-      title = "Average outmigration rates by group (2007 - 2018)",
+      title = "Average outmigration rates (2007 - 2018)",
       subtitle = 
         str_glue(
           "Area: {area}", 
           area = str_to_upper(str_extract(df_name, "^\\w+(?=_)"))
         ),
       x = NULL,
-      y = "Outmigration rate"
+      y = "Outmigration rate",
+      fill = NULL
     )
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/outmigration_bar_{area}.png",
+      "./SGC/visualizations/bar_plots/outmigration_bar_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = bar_plot)
@@ -453,27 +457,30 @@ outmigration_reg <- function(area_stats, area_psm, reg_output = html, font_size 
 }
 
 ## Create NOAH type plots
-noah_type_bar_plot <- function(area_stats, area_psm, noah_type, type_short, plot_title) {
+noah_type_bar_plot <- function(area_stats, area_psm) {
   df_name <- deparse(substitute(area_psm))
-  noah_type <- enquo(noah_type)
-  type_short <- enquo(type_short)
-  plot_title <- enquo(plot_title)
   investment_name <- deparse(substitute(area_stats))
   
   investment_type <- str_extract(investment_name, "^.+(?=_stats)")
   
   # NOAH  change
+  
   noah_bar <-
     area_stats %>% 
-    ggplot(aes(x = investment, y = !! noah_type)) +
-    geom_col() +
-    scale_x_discrete(labels = c("No Investment", "Investment")) +
+    select(investment, perc_noah_tot_change, perc_noah_nolihtc_change) %>% 
+    pivot_longer(cols = c(perc_noah_tot_change, perc_noah_nolihtc_change)) %>% 
+    ggplot(aes(x = name, y = value, fill = investment)) +
+    geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
+    scale_x_discrete(labels = c("No LIHTC", "Total")) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    scale_fill_discrete(labels = c("No Investment", "Investment")) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "bottom") +
     labs(
       title =
         str_glue(
-          quo_name(plot_title), 
-          " ({type})", 
+          "{type} ",
+          "NOAH change (2009 - 2016)",
           type = 
             str_to_title(str_replace_all(investment_type, "_", " "))
         ),
@@ -483,14 +490,14 @@ noah_type_bar_plot <- function(area_stats, area_psm, noah_type, type_short, plot
           area = str_to_upper(str_extract(df_name, "^\\w+(?=_)"))
         ),
       x = NULL,
-      y = "% change\n(2009 - 2016)"
+      y = "% change",
+      fill = NULL
     )
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/noah_{type}_{area}_{invest}.png",
+      "./SGC/visualizations/bar_plots/noah_{area}_{invest}.png",
       area = str_extract(df_name, "^\\w+(?=_)"),
-      type = quo_name(type_short),
       invest = investment_type
     )
   ggsave(path, plot = noah_bar)
@@ -532,8 +539,7 @@ noah_type_reg <- function(area_stats, area_psm, reg_output = html, font_size = "
 }
 
 ## Create outmigration plots
-outmigration_type_time <- function(area_stats, area_psm, outmigration_type, plot_title) {
-  outmigration_type <- enquo(outmigration_type)
+outmigration_type_time <- function(area_stats, area_psm) {
   df_name <- deparse(substitute(area_psm))
   investment_name <- deparse(substitute(area_stats))
   
@@ -543,60 +549,67 @@ outmigration_type_time <- function(area_stats, area_psm, outmigration_type, plot
   time_plot <-
     area_stats %>% 
     # select for investment and outmigration type
-    select(investment_type, starts_with(!! outmigration_type)) %>% 
+    select(investment, starts_with("outmigration")) %>% 
     # change structure of data for plotting
     pivot_longer(
-      cols = starts_with(!! outmigration_type),
-      names_to = "year",
+      cols = starts_with("outmigration"),
+      names_to = "type",
       values_to = "migration_rate"
     ) %>% 
     # extract the year digits
-    mutate(year = str_extract(year, "\\d{4}$")) %>%
+    mutate(
+      year = str_extract(type, "\\d{4}$"),
+      type = str_remove(type, "_\\d{4}$"),
+      type = str_remove(type, "outmigration"),
+      type = str_replace_all(type, "_", " "),
+      type = str_to_title(type),
+      type = str_replace(type, "Li", "Low Income")
+    ) %>%
     # plot outmigration over time
     ggplot(
-      aes_string(
-        x = "year", 
-        y = "migration_rate", 
-        color = investment_type,
-        group = investment_type
-      )
+      aes(x = year, y = migration_rate, color = investment, group = investment)
     ) +
     geom_point() +
     geom_path() +
     geom_smooth(
-      aes_string(fill = investment_type), 
+      aes(fill = investment), 
       alpha = .1, 
       linetype = "dashed",
       show.legend = FALSE
     ) +
+    facet_wrap(~ type, ncol = 2) +
     scale_color_discrete(labels = c("No Investment", "Investment")) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     guides(color = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "bottom", axis.text.x = element_text(size = 8)) +
     labs(
-      title = str_glue(plot_title, " Change Over Time"),
-      subtitle = 
+      title =
         str_glue(
-          "Area: {area}", 
+          str_to_title(str_replace_all(investment_type, "_", " ")),
+          " outmigration change (2007 - 2018)"
+        ),
+      subtitle =
+        str_glue(
+          "Area: {area}",
           area = str_to_upper(str_extract(df_name, "^\\w+(?=_)"))
         ),
       y = "Outmigration Rate",
       x = NULL,
-      color = str_to_title(str_replace_all(investment_type, "_", " "))
+      color = NULL
     )
-  # Save to PNG 
+  # Save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/{outmigration_type}_{area}_{investment_type}.png",
-      outmigration_type = quo_name(outmigration_type),
-      area = str_extract(df_name, "^\\w+(?=_)")
+      "./SGC/visualizations/time_series/outmigration_{area}_{investment_type}.png",
+      area = str_extract(df_name, "^\\w+(?=_)"),
+      investment_type = quo_name(investment_type)
     )
   ggsave(path, plot = time_plot)
   
   return(time_plot)
 }
 
-outmigration_type_bar <- function(area_stats, area_psm, outmigration_type, plot_title) {
-  outmigration_type <- enquo(outmigration_type)
+outmigration_type_bar <- function(area_stats, area_psm) {
   df_name <- deparse(substitute(area_psm))
   investment_name <- deparse(substitute(area_stats))
   
@@ -604,25 +617,36 @@ outmigration_type_bar <- function(area_stats, area_psm, outmigration_type, plot_
   
   # Plot investment graph
   bar_plot <-
-    area_stats %>%
-    select(investment_type, starts_with(!! outmigration_type)) %>%
+    area_stats %>% 
+    select(investment_type, contains("outmigration")) %>% 
     pivot_longer(
-      cols = starts_with(!! outmigration_type),
-      names_to = "year",
+      cols = contains("outmigration"),
+      names_to = "type",
       values_to = "migration_rate"
-    ) %>%
-    mutate(year = str_extract(year, "\\d{4}$")) %>%
-    group_by(.dots = investment_type) %>%
-    summarise(migration_rate = mean(migration_rate)) %>%
-    ggplot(aes_string(x = investment_type, y = "migration_rate")) +
-    geom_col() +
-    scale_x_discrete(labels = c("No Investment", "Investment")) +
+    ) %>% 
+    mutate(
+      year = str_extract(type, "\\d{4}$"),
+      type = str_remove(type, "_\\d{4}$")
+    ) %>% 
+    # need to group by investment type and outmigration type
+    group_by(.dots = investment_type, type) %>% 
+    summarise(migration_rate = mean(migration_rate)) %>% 
+    ggplot(
+      aes_string(x = "type", y = "migration_rate", fill = investment_type)
+    ) +
+    geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
+    scale_x_discrete(
+      labels = c("All", "Low Income", "Low Income Renters", "Renters")
+    ) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    scale_fill_discrete(labels = c("No Investment", "Investment")) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    theme(legend.position = "bottom") +
     labs(
       title =
         str_glue(
-          plot_title,
-          " ({investment_type})",
+          "{investment_type} ",
+          "average outmigration rates (2007 - 2018)",
           investment_type =
             str_to_title(str_replace_all(investment_type, "_", " "))
         ),
@@ -632,14 +656,15 @@ outmigration_type_bar <- function(area_stats, area_psm, outmigration_type, plot_
           area = str_to_upper(str_extract(df_name, "^\\w+(?=_)"))
         ),
       x = NULL,
-      y = "Outmigration Rate\n(2007 - 2018)"
+      y = "Outmigration rate",
+      fill = NULL
     )
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/{outmigration_type}_{investment_type}_bar.png"
+      "./SGC/visualizations/bar_plots/outmigration_{investment_type}_bar.png"
     )
-  ggsave(path[2], plot = bar_plot)
+  ggsave(path, plot = bar_plot)
   
   return(bar_plot)
 }
@@ -719,7 +744,9 @@ outmigration_type_reg <- function(area_stats, area_psm, outmigration_type, reg_o
     type = quo_name(reg_output),
     title = 
       str_glue(
-        "Outmigration Rates by Investment in Area: {area}",
+        "Outmigration Rates by {type} in Area: {area}",
+        type = 
+          str_to_title(str_replace_all(investment_type, "_", " ")),
         area = str_to_upper(str_extract(df_name, "^\\w+(?=_)"))
       ),
     font.size = font_size,
@@ -911,7 +938,10 @@ investment_summary <- function(area_psm, area_stats) {
     ) %>% 
     # reorder columns
     select(investment_name, everything(), -investment_no) %>%
-    group_by(investment_name) %>% 
+    # mutate acs data to be of type double
+    mutate(across(2:length(.), as.double)) %>%
+    # mutate acs data to be of type double
+    group_by(investment_name) %>%
     # summarize NOAH and outmigration data
     summarise_all(~ sum(., na.rm = TRUE)) %>% 
     # compute change metrics
@@ -1109,8 +1139,8 @@ noah_summary_table <- function(area_summary, table_title) {
     kable_styling(latex_options="scale_down") %>% 
     # italics/black font for first row (no investment)
     row_spec(1, italic = T, bold = T) %>% 
-    # bold and border for first column
-    column_spec(1, bold = T) %>%
+    # no bold and border for first column
+    column_spec(1, bold = F) %>%
     # unify 1st column width
     column_spec(1, width = "2in") %>% 
     # push dates to second line 

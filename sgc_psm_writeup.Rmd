@@ -356,16 +356,16 @@ outmigration_tract <-
 
 # TOTAL
 ## Summary
-* __NOAH__: The NOAH investigation demonstrates that neighborhoods with investments saw a slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. However, this trend is reversed if you only consider non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (although this is not statistically significant). Again, this trend is reversed to positive when considering only non-LIHTC units (again, not statistically significant).
+* __NOAH__: When considering total NOAH units, the investigation shows that neighborhoods with investments saw a slightly slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. However, this trend is reversed if you only consider non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (although this is not statistically significant). Again, this trend is reversed to positive when considering only non-LIHTC units (again, not statistically significant).
 
 * __Outmigration__
-    + `Outmigration All`: Both time series and bar plots indicate that higher outmigration rates are associated with investments, and a linear regression confirms this obervation - demonstrating about 2.5% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+    + `Outmigration All`: The time series plot shows a mixed relationship between outmigration rates and investments, while the bar plot indicates that slightly higher outmigration rates are associated with investments. However, a linear regression reverses the bar plot obervation - demonstrating about 0.1% decrease in outmigration with the presence of an investment (this result is not statistically significant).
     
-    + `Outmigration Low Income`: The time series plot indicates a changing relationship between investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 1.6% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+    + `Outmigration Low Income`: The time series plot shows a mixed relationship between outmigration rates and investments, while the bar plot indicates that slightly lower outmigration rates are associated with investments. However, a linear regression reverses the bar plot observation - demonstrating about 0.1% increase in outmigration with the presence of an investment (this result is not statistically significant).
     
-    + `Outmigration Renters`: The time series plot indicates that higher outmigration rates are generally associated with investments, with some exceptions. The bar plot confirms this overall trend. A linear regression confirms this obervation - demonstrating about 0.7% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.05).
+    + `Outmigration Renters`: The time series plot shows a mixed relationship between outmigration rates and investments, while the bar plot indicates that slightly higher outmigration rates are associated with investments. However, a linear regression reverses the bar plot obervation - demonstrating about 0.2% decrease in outmigration with the presence of an investment (this result is not statistically significant).
     
-    + `Outmigration Low Income Renters`: The time series plot indicates a variable relationship between investments and outmigration, while the bar plot indicates a very slight trend towards increased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 0.5% increase in outmigration with the presence of an investment (this result is not statistically significant).
+    + `Outmigration Low Income Renters`: The time series plot shows a mixed relationship between outmigration rates and investments, while the bar plot indicates that slightly lower outmigration rates are associated with investments. However, a linear regression reverses the bar plot observation - demonstrating about 0.03% increase in outmigration with the presence of an investment (this result is not statistically significant).
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 ### Join Investment, NOAH, and Outmigration Data 
@@ -404,8 +404,7 @@ outmigration_summary_table_total
 
 ## NOAH Investigation
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-noah_plot <- noah_bar_plot(total_stats, total_psm)
-noah_plot
+noah_bar_plot(total_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -418,7 +417,6 @@ noah_reg(total_stats, total_psm, reg_output = latex, font_size = "tiny")
 ### Time series
 outmig_time <- outmigration_time(total_stats, total_psm)
 ```
-
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Bar plot
@@ -435,65 +433,63 @@ cowplot::plot_grid(
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 # Outmigration regression
-outmigration_reg(total_stats, total_psm, text, "tiny")
+outmigration_reg(total_stats, total_psm, latex, "tiny")
 ```
-
-
-
-# BREAK HERE, NEED TO ADJUST SOURCE CODE FOR SPECIFIC TYPE
-
-
-
-
 
 # INVESTMENT TYPE
 ## Summary
-* __NOAH__
-    + `Greening`: The NOAH investigation shows that neighborhoods with greening investments saw a much faster increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is largely maintained when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a positive relationship with NOAH units (this is statistically significant at p<0.05). Again, this trend is maintained when considering only non-LIHTC units (again, this is statistically significant at p<0.05).
+* `Greening`
 
-    + `Transit`: The NOAH investigation shows that neighborhoods with transit investments saw a slightly slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is reversed when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is not statistically significant). Again, this trend is reversed to a positive relationship when considering only non-LIHTC units (this is not statistically significant).
+    + __NOAH__: The NOAH investigation shows that neighborhoods with greening investments saw a much faster increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a positive relationship with NOAH units (this is statistically significant at p<0.05). Again, this trend is maintained when considering only non-LIHTC units (this is statistically significant at p<0.1).
+    
+    + __Outmigration__
+        - `Outmigration All`: The time series plot shows a mixed relationship, while the bar plot indicates that higher outmigration rates are associated with greening investments. A linear regression confirms this obervation - demonstrating about 0.7% increase in outmigration with the presence of an investment (this result is not statistically significant).
 
-    + `Urban Infill`: The NOAH investigation shows that neighborhoods with urban infill investments saw a decrease in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is reversed when only considering non-LIHTC NOAH units, but still maintains a much slower increase in the quantity of NOAH units that neighborhoods without investments. Conducting a linear regression shows that the presence of investments indicates a highly negative relationship with NOAH units (this is statistically significant at p<0.05). This trend is maintained when considering only non-LIHTC units (this is statistically significant at p<0.1).
+        - `Outmigration Low Income`: The time series plot indicates a mixed relationship, while the bar plot indicates a slight trend towards decreased outmigration in greening investment neighborhoods. A linear regression provides confirms the bar plot, demonstrating about 0.6% decrease in outmigration with the presence of an investment (this result is not statistically significant).
 
-    + `Active Transportation`: The NOAH investigation shows that neighborhoods with active transportation investments saw a slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is not statistically significant). Again, this trend is maintained when considering only non-LIHTC units (this is not statistically significant).
-
-* __Outmigration__
-    + `Greening`
-        - `Outmigration All`: Both time series and bar plots indicate that higher outmigration rates are associated with greening investments, and a linear regression confirms this obervation - demonstrating about 3.3% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
-
-        - `Outmigration Low Income`: The time series plot indicates a variable relationship between greening investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in greening investment neighborhoods. A linear regression provides mixed results, a slightly positive relationship - 1.1% increase - between greening investments and outmigration (this result is not statistically significant).
-
-        - `Outmigration Renters`: The time series plot indicates a variable relationship between greening investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in greening investment neighborhoods. A linear regression reverses this observation - demonstrating about 0.8% decrease in outmigration with the presence of an investment (this result is not statistically significant).
+        - `Outmigration Renters`: The time series plot indicates a variable relationship between greening investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in greening investment neighborhoods. A linear regression reverses this observation - demonstrating about 1.8% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.1).
         
-        - `Outmigration Low Income Renters`: The time series plot indicates a variable relationship between greening investments and outmigration, while the bar plot indicates a very slight trend towards increased outmigration in greening investment neighborhoods. A linear regression reverses this observation - demonstrating about 1.2% decrease in outmigration with the presence of an investment (this result is not statistically significant).
-
-    + `Transit`
-        - `Outmigration All`: Both time series and bar plots indicate that higher outmigration rates are associated with transit investments, and a linear regression confirms this obervation - demonstrating about 3.2% increase in outmigration with the presence of a transit investment (this result is statistically significant at p<0.01).
-
-        - `Outmigration Low Income`: The time series plot indicates that transit investments are generally associated with higher outmigration rates, and the bar plot confirms this overall trend. A linear regression further confirms this trend, indicating an about 2.8% increase in outmigration with the presence of a transit investment (this result is statistically significant at p<0.01).
-
-        - `Outmigration Renters`: The time series plot indicates that transit investments are generally associated with higher outmigration rates, and the bar plot confirms this overall trend. A linear regression further confirms this trend, indicating an about 2.1% increase in outmigration with the presence of a transit investment (this result is statistically significant at p<0.01).
+        - `Outmigration Low Income Renters`: The time series plot indicates a variable relationship between greening investments and outmigration, while the bar plot indicates no trends. A linear regression demonstrates about 1.7% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.1).
         
-        - `Outmigration Low Income Renters`: The time series plot indicates that transit investments are generally associated with higher outmigration rates, and the bar plot confirms this overall trend. A linear regression further confirms this trend, indicating an about 2.0% increase in outmigration with the presence of a transit investment (this result is statistically significant at p<0.01).
+* `Transit`
 
-    + `Urban Infill`
-        - `Outmigration All`: The time series plot indicates a variable relationship between urban infill investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in urban infill investment neighborhoods. A linear regression reverses this obervation - demonstrating a slight 0.2% decrease in outmigration with the presence of an urban infill investment (this result is not statistically significant).
+    + __NOAH__: The NOAH investigation shows that neighborhoods with transit investments saw a slightly faster increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is increased when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is not statistically significant). This trend is reversed when considering only non-LIHTC units (this is not statistically significant).
+    
+    + __Outmigration__
+        - `Outmigration All`: The time series plot shows a slightly higher outmigration rates associated with transit investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 0.7% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.1).
 
-        - `Outmigration Low Income`: The time series plot indicates a variable relationship between urban infill investments and outmigration, while the bar plot indicates a slight trend towards decreased outmigration in urban infill investment neighborhoods. However, a linear regression indicates a slightly positive relationship between urban infill investment and outmigration rates (this is not statistically significant).
+        - `Outmigration Low Income`: The time series plot shows a slightly higher outmigration rates associated with transit investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 1.3% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
 
-        - `Outmigration Renters`: The time series plot indicates a variable relationship between urban infill investments and outmigration, while the bar plot indicates a slight trend towards decreased outmigration in urban infill investment neighborhoods. A linear regression indicates a negative relationship between urban infill investment and outmigration rates at -1.2% (this is statistically significant at p<0.05).
+        - `Outmigration Renters`: The time series plot shows a slightly higher outmigration rates associated with transit investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 1.1% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
         
-        - `Outmigration Low Income Renters`: The time series plot indicates a variable relationship between urban infill investments and outmigration, while the bar plot indicates a trend towards decreased outmigration in urban infill investment neighborhoods. A linear regression indicates a negative relationship between urban infill investment and outmigration rates at -1.8% (this is statistically significant at p<0.05).
-
-    + `Active Transportation`
-        - `Outmigration All`: Both the time series and bar plots indicate a largely neutral relationship between active transportation investments and outmigration. A linear regression demonstrates a slightly positive relationship between active transportation investments and outmigration rates at about 0.5% (this is not statistically significant).
-
-        - `Outmigration Low Income`: Both time series and bar plots indicate that lower outmigration rates are associated with active transportation investments. A linear regression confirms this trend, demonstrating a negative relationship of about -1.8% between the two (this is statistically significant at p<0.01).
-
-        - `Outmigration Renters`: Both time series and bar plots indicate that lower outmigration rates are associated with active transportation investments. A linear regression confirms this trend, demonstrating a negative relationship of about -2.3% between the two (this is statistically significant at p<0.01).
+        - `Outmigration Low Income Renters`: The time series plot shows a slightly higher outmigration rates associated with transit investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 1.4% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
         
-        - `Outmigration Low Income`: Both time series and bar plots indicate that lower outmigration rates are associated with active transportation investments. A linear regression confirms this trend, demonstrating a negative relationship of about -2.9% between the two (this is statistically significant at p<0.01).
+* `Urban Infill`
 
+    + __NOAH__: The NOAH investigation shows that neighborhoods with urban infill investments saw a decrease in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is reversed (although the increase is for investment neighborhoods is slower) when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is statistically significant at p<0.5). This trend is maintained when considering only non-LIHTC units (this is not statistically significant).
+    
+    + __Outmigration__
+        - `Outmigration All`: The time series plot shows that mostly lower outmigration rates associated with urban infill investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 2.9% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+
+        - `Outmigration Low Income`: The time series plot shows that mostly lower outmigration rates associated with urban infill investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 1.3% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.05).
+
+        - `Outmigration Renters`: The time series plot shows that mostly lower outmigration rates associated with urban infill investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 2.1% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+        
+        - `Outmigration Low Income Renters`: The time series plot shows that mostly lower outmigration rates associated with urban infill investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 2.3% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+        
+* `Active Transportation`
+
+    + __NOAH__: The NOAH investigation shows that neighborhoods with active transportation investments saw a slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is not statistically significant). This trend is maintained when considering only non-LIHTC units (this is not statistically significant).
+    
+    + __Outmigration__
+        - `Outmigration All`: The time series plot shows that lower outmigration rates associated with active transportation investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 2.1% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+
+        - `Outmigration Low Income`: The time series plot shows that lower outmigration rates associated with active transportation investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 3.4% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+
+        - `Outmigration Renters`: The time series plot shows that lower outmigration rates associated with active transportation investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 3.2% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+        
+        - `Outmigration Low Income Renters`: The time series plot shows that lower outmigration rates associated with active transportation investments, and the bar plot confirms this. A linear regression also confirms this observation - demonstrating about 3.4% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+        
 ```{r, warning=FALSE, message=FALSE}
 ### Generate Descriptive Stats per Investment Type
 # Greening
@@ -513,25 +509,7 @@ active_transportation_stats <-
 ## Greening
 ### NOAH Investigation (GREENING)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.width=12}
-noah_total_plot <-
-  noah_type_bar_plot(
-    greening_stats, total_psm, perc_noah_tot_change, total, "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_type_bar_plot(
-    greening_stats,
-    total_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_type_bar_plot(greening_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -542,89 +520,16 @@ noah_type_reg(greening_stats, total_psm, reg_output = latex)
 ### Outmigration Investigation (GREENING)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_type_time(
-    greening_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_type_time(
-    greening_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_type_time(
-    greening_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_type_time(
-    greening_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_type_time(greening_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_type_bar(
-    greening_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_type_bar(
-    greening_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_type_bar(
-    greening_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_type_bar(
-    greening_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_bar <- outmigration_type_bar(greening_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 14}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -636,25 +541,7 @@ outmigration_type_reg(
 ## Transit
 ### NOAH Investigation (TRANSIT)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.width=12}
-noah_total_plot <-
-  noah_type_bar_plot(
-    transit_stats, total_psm, perc_noah_tot_change, total, "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_type_bar_plot(
-    transit_stats,
-    total_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_type_bar_plot(transit_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -665,89 +552,16 @@ noah_type_reg(transit_stats, total_psm, reg_output = latex)
 ### Outmigration Investigation (TRANSIT)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_type_time(
-    transit_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_type_time(
-    transit_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_type_time(
-    transit_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_type_time(
-    transit_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_type_time(transit_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_type_bar(
-    transit_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_type_bar(
-    transit_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_type_bar(
-    transit_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_type_bar(
-    transit_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_bar <- outmigration_type_bar(transit_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 14}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -759,29 +573,7 @@ outmigration_type_reg(
 ## Urban Infill
 ### NOAH Investigation (URBAN INFILL)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.width=12}
-noah_total_plot <-
-  noah_type_bar_plot(
-    urban_infill_stats,
-    total_psm,
-    perc_noah_tot_change,
-    total,
-    "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_type_bar_plot(
-    urban_infill_stats,
-    total_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_type_bar_plot(urban_infill_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -792,89 +584,16 @@ noah_type_reg(urban_infill_stats, total_psm, reg_output = latex)
 ### Outmigration Investigation (URBAN INFILL)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_type_time(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_type_time(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_type_time(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_type_time(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_type_time(urban_infill_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_type_bar(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_type_bar(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_type_bar(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_type_bar(
-    urban_infill_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_bar <- outmigration_type_bar(urban_infill_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 14}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -884,31 +603,9 @@ outmigration_type_reg(
 ```
 
 ## Active Transportation
-### NOAH Investigation (ACTIVE TRANSPORTATION)
+### NOAH Investigation (GREENING)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.width=12}
-noah_total_plot <-
-  noah_type_bar_plot(
-    active_transportation_stats,
-    total_psm,
-    perc_noah_tot_change,
-    total,
-    "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_type_bar_plot(
-    active_transportation_stats,
-    total_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_type_bar_plot(active_transportation_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -916,92 +613,19 @@ gridExtra::grid.arrange(
 noah_type_reg(active_transportation_stats, total_psm, reg_output = latex)
 ```
 
-### Outmigration Investigation (ACTIVE TRANSPORTATION)
+### Outmigration Investigation (GREENING)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_type_time(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_type_time(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_type_time(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_r",
-    "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_type_time(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_type_time(active_transportation_stats, total_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_type_bar(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_type_bar(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_type_bar(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_type_bar(
-    active_transportation_stats,
-    total_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+outmig_bar <- outmigration_type_bar(active_transportation_stats, total_psm)
 ```
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 12, fig.width = 16}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 14}
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -1012,18 +636,18 @@ outmigration_type_reg(
 
 # LOS ANGELES
 ## Summary
-* __NOAH__: The LA NOAH investigation shows that neighborhoods with investments saw a slower increase in the quantity NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units, but the rate of increase is closer to the control neighborhoods. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (although this is not statistically significant). Again, this trend is maintained when considering only non-LIHTC units (again, not statistically significant). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
+* __NOAH__: The LA NOAH investigation shows that neighborhoods with investments saw a slower increase in the quantity NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. Conducting a linear regression shows that the presence of investments indicates a negative relationship with NOAH units (this is not statistically significant at p<0.1). Again, this trend is maintained when considering only non-LIHTC units (this is not statistically significant). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
 
 * __Outmigration__
     + `Overall Patterns`: See the summary tables for LA outmigration rates, including by investment type and by specific investment. Both tables show neighborhood trends based on the presence of the investment/investment type.
     
-    + `Outmigration All`: Both time series and bar plots indicate that higher  outmigration rates are not particularly associated with the presence of investments, and a linear regression confirms this non-relationship - although there is a slightly positive relationship between investment and outmigration (this result is not statistically significant).
+    + `Outmigration All`: Both time series and bar plots indicate that lower  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 1.4% decrease (this result is statistically significant at p<0.01).
 
-    + `Outmigration Low Income`: The same basic findings from `Outmigration All` apply here.
+    + `Outmigration Low Income`: Both time series and bar plots indicate that lower  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 1.4% decrease (this result is statistically significant at p<0.01).
 
-    + `Outmigration Renters`: The same basic findings from `Outmigration All` apply here, except that the slightly positive relationship between investment and outmigration is statistically significant at p<0.1.
+    + `Outmigration Renters`: Both time series and bar plots indicate that lower  outmigration rates are generally associated with the presence of investments, although the time series is less conclusive. A linear regression confirms the relationship with a 0.5% decrease (this result is not statistically significant).
 
-    + `Outmigration Low Income Renters`: The same basic findings from `Outmigration All` apply here. 
+    + `Outmigration Low Income Renters`: Both time series and bar plots indicate that lower  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 0.9% decrease (this result is statistically significant at p<0.01).
     
 
 ```{r, warning=FALSE, message=FALSE}
@@ -1090,118 +714,27 @@ outmigration_invest_table_la
 
 ## NOAH Investigation (LA)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-noah_total_plot <-
-  noah_bar_plot(
-    la_stats, la_psm, perc_noah_tot_change, total, "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_bar_plot(
-    la_stats,
-    la_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_bar_plot(la_stats, la_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 # Regression
-noah_reg(la_stats, la_psm, reg_output = latex)
+noah_reg(la_stats, la_psm, reg_output = latex, font_size = "tiny")
 ```
 
 ## Outmigration Investigation (LA)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_time(
-    la_stats,
-    la_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_time(
-    la_stats,
-    la_psm,
-    "outmigration_LI_2",
-    "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_time(
-    la_stats,
-    la_psm,
-    "outmigration_r",
-    "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_time(
-    la_stats,
-    la_psm,
-    "outmigration_LI_r",
-    "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_time(la_stats, la_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_bar(
-    la_stats,
-    la_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_bar(
-    la_stats,
-    la_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_bar(
-    la_stats,
-    la_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_bar(
-    la_stats,
-    la_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+### Bar plot
+outmig_bar <- outmigration_bar(la_stats, la_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 12}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -1211,18 +744,18 @@ outmigration_reg(la_stats, la_psm, latex, "tiny")
 
 # FRESNO
 ## Summary
-* __NOAH__: The Fresno NOAH investigation shows that neighborhoods with investments saw a much slower increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when considering only non-LIHTC NOAH units. Conducting a linear regression demonstrates that the presence of investments indicates a negative change in NOAH units (although this is not statistically significant). Again, this trend is maintained when considering only non-LIHTC units (again, not statistically significant). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
+* __NOAH__: The Fresno NOAH investigation shows that neighborhoods with investments saw an increase in the quantity of NOAH units between 2009 and 2016, while neighborhoods without saw a decrease. This trend is slightly altered when considering only non-LIHTC NOAH units - non-investment neighborhoods have a slight increase in NOAH units (still below the rate of investment neighborhoods). Conducting a linear regression demonstrates that the presence of investments indicates a positive change in NOAH units (this is statistically significant at p<0.1). Again, this trend is maintained when considering only non-LIHTC units (this is statistically significant at p<0.1). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
 
 * __Outmigration__
     + `Overall Patterns`: See the summary tables for Fresno outmigration rates, including by investment type and by specific investment. Both tables show neighborhood trends based on the presence of the investment/investment type.
     
-    + `Outmigration All`: Both time series and bar plots indicate that higher outmigration rates are associated with the presence of investments, and a linear regression confirms this observation - demonstrating about 5.5% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+    + `Outmigration All`: Both time series and bar plots indicate that higher  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 1.2% increase (this result is not statistically significant).
 
-    + `Outmigration Low Income`:  Both time series and bar plots indicate that higher outmigration rates are associated with the presence of investments, and a linear regression confirms this observation - demonstrating about 4.2% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+    + `Outmigration Low Income`: Both time series and bar plots indicate that higher  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 3.9% increase (this result is statistically significant at p<0.01).
 
-    + `Outmigration Renters`: The time series plot indicates that higher outmigration rates are generally associated with investments, with some exceptions. The bar plot confirms this overall trend. A linear regression confirms this trend - demonstrating about 1.4% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.05).
+    + `Outmigration Renters`: Both time series and bar plots indicate that higher  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 1.9% increase (this result is statistically significant at p<0.05).
     
-    + `Outmigration Low Income Renters`: The time series plot indicates that higher outmigration rates are generally associated with investments, with some exceptions. The bar plot confirms this overall trend. A linear regression also confirms this trend - demonstrating about 1.9% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.05).
+    + `Outmigration Low Income Renters`: Both time series and bar plots indicate that higher  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 3.3% increase (this result is statistically significant at p<0.01).
 
 ```{r, warning=FALSE, message=FALSE}
 ### Join Investment and NOAH Data
@@ -1307,118 +840,27 @@ outmigration_invest_table_fresno
 
 ## NOAH Investigation (FRESNO)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-noah_total_plot <-
-  noah_bar_plot(
-    fresno_stats, fresno_psm, perc_noah_tot_change, total, "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_bar_plot(
-    fresno_stats,
-    fresno_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_bar_plot(fresno_stats, fresno_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 # Regression
-noah_reg(fresno_stats, fresno_psm, reg_output = latex)
+noah_reg(fresno_stats, fresno_psm, reg_output = latex, font_size = "tiny")
 ```
 
 ## Outmigration Investigation (FRESNO)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_time(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_time(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_LI_2",
-    "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_time(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_r",
-    "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_time(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_LI_r",
-    "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_time(fresno_stats, fresno_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_bar(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_bar(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_bar(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_bar(
-    fresno_stats,
-    fresno_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+### Bar plot
+outmig_bar <- outmigration_bar(fresno_stats, fresno_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 12}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -1428,18 +870,18 @@ outmigration_reg(fresno_stats, fresno_psm, latex, "tiny")
 
 # SF BAY AREA
 ## Summary
-* __NOAH__: The SF Bay Area NOAH investigation shows that neighborhoods with investments saw a faster increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. This is a reversal of the general trend and trend seen in the other study areas. Conducting a linear regression shows that the presence of investments indicates a positive change in NOAH units (although this is not statistically significant). Again, this trend is maintained when considering only non-LIHTC units (this is statistically significant at p<0.1). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
+* __NOAH__: The SF Bay Area NOAH investigation shows that neighborhoods with investments saw a faster increase in the quantity of NOAH units between 2009 and 2016 than did neighborhoods without. This trend is maintained when only considering non-LIHTC NOAH units. This is a reversal of the general trend and trend seen in the other study areas. Conducting a linear regression shows that the presence of investments indicates a positive change in NOAH units (although this is not statistically significant). Again, this trend is maintained when considering only non-LIHTC units (this is not statistically significant). The NOAH summary tables break down this relationship by investment type, and then by the specific investment cases.
 
 * __Outmigration__
     + `Overall Patterns`: See the summary tables for SF Bay Area outmigration rates, including by investment type and by specific investment. Both tables show neighborhood trends based on the presence of the investment/investment type.
 
-    + `Outmigration All`: Both time series and bar plots indicate that higher outmigration rates are associated with investments, and a linear regression confirms this observation - demonstrating about 3.7% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.01).
+    + `Outmigration All`: Both time series and bar plots indicate that higher  outmigration rates are generally associated with the presence of investments, and a linear regression confirms this relationship with a 1.6% increase (this result is statistically significant at p<0.05).
 
-    + `Outmigration Low Income`: The time series plot indicates a changing relationship between investments and outmigration, while the bar plot indicates a slight trend towards increased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 1.8% increase in outmigration with the presence of an investment (this result is statistically significant at p<0.05).
+    + `Outmigration Low Income`: The time series plot indicates a mixed relationship between investments and outmigration, while the bar plot indicates a slight trend towards decreased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 0.5% decrease in outmigration with the presence of an investment (this result is not statistically significant).
 
-    + `Outmigration Renters`: The time series plot indicates that slightly higher outmigration rates are generally associated with investments, with some exceptions. The bar plot confirms this overall trend. A linear regression produces more mixed results - indicating a 0.05% increase in outmigration with the presence of an investment (this result is not statistically significant).
+    + `Outmigration Renters`: The time series plot indicates a mixed relationship between investments and outmigration, while the bar plot indicates a slight trend towards decreased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 1.5% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.5).
     
-    + `Outmigration Low Income Renters`: The time series plot indicates that slightly lower outmigration rates are generally associated with investments, with some exceptions. The bar plot confirms this overall trend. A linear regression also confirms this trend - indicating a 0.4% decrease in outmigration with the presence of an investment (this result is not statistically significant).
+    + `Outmigration Low Income Renters`: The time series plot indicates a mixed relationship between investments and outmigration, while the bar plot indicates a slight trend towards decreased outmigration in investment neighborhoods. A linear regression confirms the bar plot, demonstrating about 1.3% decrease in outmigration with the presence of an investment (this result is statistically significant at p<0.5).
 
 ```{r, warning=FALSE, message=FALSE}
 ### Join Investment and NOAH Data
@@ -1543,120 +985,29 @@ outmigration_invest_table_sf <-
 outmigration_invest_table_sf
 ```
 
-## NOAH Investigation (SF BAY)
+## NOAH Investigation (SF)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-noah_total_plot <-
-  noah_bar_plot(
-    sf_stats, sf_psm, perc_noah_tot_change, total, "Total NOAH Change"
-  )
-
-noah_nolihtc_plot <-
-  noah_bar_plot(
-    sf_stats,
-    sf_psm,
-    perc_noah_nolihtc_change,
-    nolihtc,
-    "NOAH (No LIHTC) Change"
-  )
-
-gridExtra::grid.arrange(
-  noah_total_plot,
-  noah_nolihtc_plot,
-  ncol = 2
-)
+noah_bar_plot(sf_stats, sf_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 # Regression
-noah_reg(sf_stats, sf_psm, reg_output = latex)
+noah_reg(sf_stats, sf_psm, reg_output = latex, font_size = "tiny")
 ```
 
-## Outmigration Investigation (SF BAY)
+## Outmigration Investigation (SF)
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
 ### Time series
-# All outmigration
-outmig_time_all <-
-  outmigration_time(
-    sf_stats,
-    sf_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_time_li <-
-  outmigration_time(
-    sf_stats,
-    sf_psm,
-    "outmigration_LI_2",
-    "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_time_r <-
-  outmigration_time(
-    sf_stats,
-    sf_psm,
-    "outmigration_r",
-    "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_time_li_r <-
-  outmigration_time(
-    sf_stats,
-    sf_psm,
-    "outmigration_LI_r",
-    "Low Income Renter Outmigration"
-  )
+outmig_time <- outmigration_time(sf_stats, sf_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
-### Bar plots
-# All outmigration
-outmig_bar_all <-
-  outmigration_bar(
-    sf_stats,
-    sf_psm,
-    "outmigration_all",
-    plot_title = "Total Outmigration"
-  )
-# Low Income outmigration
-outmig_bar_li <-
-  outmigration_bar(
-    sf_stats,
-    sf_psm,
-    "outmigration_LI_2",
-    plot_title = "Low Income Outmigration"
-  )
-# Renters outmigration
-outmig_bar_r <-
-  outmigration_bar(
-    sf_stats,
-    sf_psm,
-    "outmigration_r",
-    plot_title = "Renter Outmigration"
-  )
-# Low Income Renters outmigration
-outmig_bar_li_r <-
-  outmigration_bar(
-    sf_stats,
-    sf_psm,
-    "outmigration_LI_r",
-    plot_title = "Low Income Renter Outmigration"
-  )
+### Bar plot
+outmig_bar <- outmigration_bar(sf_stats, sf_psm)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis", fig.height = 10, fig.width = 12}
-cowplot::plot_grid(
-  outmig_time_all,
-  outmig_bar_all,
-  outmig_time_li,
-  outmig_bar_li,
-  outmig_time_r,
-  outmig_bar_r,
-  outmig_time_li_r,
-  outmig_bar_li_r,
-  ncol = 2,
-  rel_widths = c(2/3, 1/3)
-)
+cowplot::plot_grid(outmig_time, outmig_bar, ncol = 1)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="asis"}
@@ -1711,57 +1062,57 @@ sf_investment_summary %>%
 ```{r save-kables, eval=FALSE}
 # save NOAH total kable
 noah_summary_table_total %>%
-  save_kable("./SGC/visualizations/noah_summary_table_total.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_summary_table_total.png")
 
 # save Outmigration total kable
 outmigration_summary_table_total %>%
-  save_kable("./SGC/visualizations/outmigration_summary_table_total.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_summary_table_total.png")
 
 # save NOAH LA kable
 noah_summary_table_la %>%
-  save_kable("./SGC/visualizations/noah_summary_table_la.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_summary_table_la.png")
 
 # save Outmigration LA kable
 outmigration_summary_table_la %>%
-  save_kable("./SGC/visualizations/outmigration_summary_table_la.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_summary_table_la.png")
 
 # save investment NOAH LA kable
 noah_invest_table_la %>%
-  save_kable("./SGC/visualizations/noah_investments_table_la.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_investments_table_la.png")
 
 # save investment Outmigration LA kable
 outmigration_invest_table_la %>%
-  save_kable("./SGC/visualizations/outmigration_investments_table_la.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_investments_table_la.png")
 
 # save NOAH Fresno kable
 noah_summary_table_fresno %>%
-  save_kable("./SGC/visualizations/noah_summary_table_fresno.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_summary_table_fresno.png")
 
 # save outmigration Fresno kable
 outmigration_summary_table_fresno %>%
-  save_kable("./SGC/visualizations/outmigration_summary_table_fresno.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_summary_table_fresno.png")
 
 # save investment NOAH Fresno kable
 noah_invest_table_fresno %>%
-  save_kable("./SGC/visualizations/noah_investments_table_fresno.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_investments_table_fresno.png")
 
 # save investment outmigration Fresno kable
 outmigration_invest_table_fresno %>%
-  save_kable("./SGC/visualizations/outmigration_investments_table_fresno.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_investments_table_fresno.png")
 
 # save NOAH SF kable
 noah_summary_table_sf%>%
-  save_kable("./SGC/visualizations/noah_summary_table_sf.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_summary_table_sf.png")
 
 # save outmigration SF kable
 outmigration_summary_table_sf %>%
-  save_kable("./SGC/visualizations/outmigration_summary_table_sf.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_summary_table_sf.png")
 
 # save investment NOAH SF kable
 noah_invest_table_sf %>%
-  save_kable("./SGC/visualizations/noah_investments_table_sf.png")
+  save_kable("./SGC/visualizations/summary_tables/noah_investments_table_sf.png")
 
 # save investment outmigration SF kable
 outmigration_invest_table_sf %>%
-  save_kable("./SGC/visualizations/outmigration_investments_table_sf.png")
+  save_kable("./SGC/visualizations/summary_tables/outmigration_investments_table_sf.png")
 ```
