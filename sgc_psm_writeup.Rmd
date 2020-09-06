@@ -438,6 +438,14 @@ cowplot::plot_grid(
 outmigration_reg(total_stats, total_psm, text, "tiny")
 ```
 
+
+
+# BREAK HERE, NEED TO ADJUST SOURCE CODE FOR SPECIFIC TYPE
+
+
+
+
+
 # INVESTMENT TYPE
 ## Summary
 * __NOAH__
