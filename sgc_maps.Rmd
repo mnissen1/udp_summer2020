@@ -136,24 +136,12 @@ outmigration_tract <- read_csv(outmigration_tract_file)
 ```{r}
 acs_tract_09_xwalk <- 
   read_csv(acs_tract_09_xwalk_file) %>% 
-  # remove the beginning "2000_"
-  rename_with(~ str_remove(., "^2000_"), starts_with("2000_"))
-
-acs_tract_18 <- read_csv(acs_tract_18_file)
-```
-
-## Join 2009 and 2018 ACS, find change numbers
-```{r}
-acs_tract_change <-
-  acs_tract_09_xwalk %>% 
-  # Add baseline 2009 to variables 
-  rename_with(~ paste0(.x, "_09"), -GEOID) %>%
-  # Create baseline variables
+  # create population and percent nonwhite
   mutate(
-    # % nonwhites in 2009
-    pct_nonwhi_09 = 1 - pct_whi_09,
     # pop nonwhites in 2009
     pop_nonwhi_09 = pop_tot_09 - pop_whi_nonhis_09,
+    # % nonwhites in 2009
+    pct_nonwhi_09 = pop_nonwhi_09 / pop_tot_09,
     # rename poverty rate 2009
     pct_pov_09 = pov_rate_09,
     # rename housing vacancy rate 2009
@@ -177,7 +165,7 @@ acs_tract_change <-
 # Join all ACS, NOAH, Outmigration data together
 ```{r}
 full_area_info <-
-  acs_tract_change %>% 
+  acs_tract_09_xwalk %>% 
   # join with 2016 data
   left_join(noah_16, by = "GEOID") %>%
   # clean joined data
@@ -246,7 +234,7 @@ total_stats_geo <-
   ) %>% 
   ungroup() %>% 
   # join with ACS data
-  left_join(acs_tract_change, by = "GEOID") %>% 
+  left_join(acs_tract_09_xwalk, by = "GEOID") %>% 
   # join with geometry
   left_join(study_tracts, by = c("GEOID" = "GEOID10")) %>%
   st_as_sf() %>% 
@@ -506,7 +494,7 @@ pal_outmig_all <-
     palette = "plasma",
     domain =
     # set domain from 0 to 1
-     c(0, 1),
+     c(min(outmig_bins), max(outmig_bins)),
     #set to custom bins
     bins = outmig_bins,
     na.color = "grey"
@@ -525,28 +513,22 @@ outmig_labs <-
   )
 ```
 
-### Non-white Population Change parameters
+### Non-white Population parameters
 ```{r}
-#min(full_area_info$pct_pnt_nonwhi_chng, na.rm = TRUE)
+max(full_area_info$pct_nonwhi_09, na.rm = TRUE)
 # set outmigration bins (incorporate both study and non study areas)
 nonwhi_bins <- 
  round(
-   BAMMtools::getJenksBreaks(full_area_info$pct_pnt_nonwhi_chng, k = 10), 2
+   BAMMtools::getJenksBreaks(full_area_info$pct_nonwhi_09, k = 10), 2
   )
-
-# add natural breaks
-nonwhi_bins <- c(nonwhi_bins, -1, 0, 1.5)
-nonwhi_bins <- sort(nonwhi_bins)
-# delete extra breaks
-nonwhi_bins <- nonwhi_bins[nonwhi_bins != 0.01]
 
 # Set non-white limits
 pal_nonwhi <- 
   colorBin(
     palette = "plasma",
     domain =
-    # set domain from -1 to 2
-     c(-1, 2),
+    # set domain from 0 to 1
+     c(min(nonwhi_bins), max(nonwhi_bins)),
     #set to custom bins
     bins = nonwhi_bins,
     na.color = "grey"
@@ -565,28 +547,22 @@ nonwhi_labs <-
   )
 ```
 
-### College Educated Change parameters
+### College Educated Population parameters
 ```{r}
 #max(full_area_info$pct_pnt_college_chng, na.rm = TRUE)
 # set outmigration bins (incorporate both study and non study areas)
 college_bins <- 
  round(
-   BAMMtools::getJenksBreaks(full_area_info$pct_pnt_college_chng, k = 10), 2
+   BAMMtools::getJenksBreaks(full_area_info$pct_college_09, k = 10), 2
   )
-
-# add natural breaks
-college_bins <- c(college_bins, -1.6, 0, 1)
-college_bins <- sort(college_bins)
-# remove extra breaks
-college_bins <- college_bins[!(college_bins %in% c(-1.57, -.03, .03, .98))]
 
 # Set college limits
 pal_college <- 
   colorBin(
     palette = "plasma",
     domain =
-    # set domain from -2 to 1
-     c(-2, 1),
+    # set domain from 0 to 1
+     c(min(college_bins), max(college_bins)),
     #set to custom bins
     bins = college_bins,
     na.color = "grey"
@@ -605,26 +581,22 @@ college_labs <-
   )
 ```
 
-### Renter-occupied Change parameters
+### Renter-occupied Population parameters
 ```{r}
 #min(full_area_info$pct_pnt_h_rent_chng, na.rm = TRUE)
 # set outmigration bins (incorporate both study and non study areas)
 renter_bins <- 
  round(
-   BAMMtools::getJenksBreaks(full_area_info$pct_pnt_h_rent_chng, k = 10), 2
+   BAMMtools::getJenksBreaks(full_area_info$pct_h_rent_09, k = 10), 2
   )
-
-# add natural breaks
-renter_bins <- c(renter_bins, 0)
-renter_bins <- sort(renter_bins)
 
 # Set renter limits
 pal_renter <- 
   colorBin(
     palette = "plasma",
     domain =
-    # set domain from -2.5 to 1
-     c(-2.5, 1),
+    # set domain from 0 to 1
+     c(min(renter_bins), max(renter_bins)),
     #set to custom bins
     bins = renter_bins,
     na.color = "grey"
@@ -643,27 +615,22 @@ renter_labs <-
   )
 ```
 
-### Median Rent Change parameters
+### Median Rent parameters
 ```{r}
 #max(full_area_info$med_rent_chng, na.rm = TRUE)
 # set outmigration bins (incorporate both study and non study areas)
 medrent_bins <- 
  round(
-   BAMMtools::getJenksBreaks(full_area_info$med_rent_chng, k = 10), 0
+   BAMMtools::getJenksBreaks(full_area_info$med_rent_09, k = 10), 0
   )
-
-# add natural breaks
-medrent_bins <- c(medrent_bins, 0, 3475)
-medrent_bins <- sort(medrent_bins)
-medrent_bins <- medrent_bins[medrent_bins != 3474]
 
 # Set median rent limits
 pal_medrent <- 
   colorBin(
     palette = "plasma",
     domain =
-    # set domain from -2500 to 3500
-     c(-2500, 3500),
+    # set domain from 0 to 4070
+     c(min(medrent_bins), max(medrent_bins)),
     #set to custom bins
     bins = medrent_bins,
     na.color = "grey"
@@ -682,26 +649,21 @@ medrent_labs <-
   )
 ```
 
-### Median Income Change parameters
+### Median Income parameters
 ```{r}
 #max(full_area_info$med_inc_chng, na.rm = TRUE)
 medinc_bins <- 
  round(
-   BAMMtools::getJenksBreaks(full_area_info$med_inc_chng, k = 10), 0
+   BAMMtools::getJenksBreaks(full_area_info$med_inc_09, k = 10), 0
   )
-
-# add natural breaks
-medinc_bins <- c(medinc_bins, -160000, 0, 250000)
-medinc_bins <- sort(medinc_bins)
-medinc_bins <- medinc_bins[!(medinc_bins %in% c(-159910, 249290))]
 
 # Set median income limits
 pal_medinc <- 
   colorBin(
     palette = "plasma",
     domain =
-    # set domain from -200000 to 250000
-     c(-200000, 250000),
+    # set domain from 0 to 304041
+     c(min(medinc_bins), max(medinc_bins)),
     #set to custom bins
     bins = medinc_bins,
     na.color = "grey"
@@ -854,7 +816,7 @@ overlay_groups <-
   )
 ```
 
-## Create dollar sign marker for investments
+### Create dollar sign marker for investments
 ```{r}
 dollar_icon <- makeAwesomeIcon(
   icon = "dollar",
@@ -862,6 +824,234 @@ dollar_icon <- makeAwesomeIcon(
   library = "fa",
   markerColor = "orange"
 )
+```
+
+### Create popups
+```{r}
+# outmigration popups
+outmigration_popup <-
+  paste(
+    # Display Tract number
+    "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
+    
+    # Display Average Outmigration Rates
+    "Average Total Outmigration Rate:",
+    scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
+    "Average Low Income Outmigration Rate:",
+    scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
+    "Average Renter Outmigration Rate:",
+    scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
+    "Average Low Income Renter Outmigration Rate:",
+    scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
+    
+    # Display investment flags by type
+    "Investment Type: ", 
+    case_when(
+      # all 4
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Transit, Urban Infill, Active Transportation",
+      # 3 investment types
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Transit, Urban Infill",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Transit, Active Transportation",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Urban Infill, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Transit, Urban Infill, Active Transportation",
+      # 2 investment types
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Transit",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Urban Infill",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Transit, Urban Infill",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Transit, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Urban Infill, Active Transportation",
+      # single investments
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Transit",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Urban Infill",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Active Transportation",
+      TRUE ~ "No Investments"
+    )
+  )
+
+# NOAH popups
+noah_popup <-
+  paste(
+    # Display Tract number
+    "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
+    
+    # Display NOAH change
+    "% NOAH Change:", 
+    scales::percent(total_stats_geo$perc_noah_tot_change, 4), "<br>",
+    
+    # Display investment flags by type
+    "Investment Type: ", 
+    case_when(
+      # all 4
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Transit, Urban Infill, Active Transportation",
+      # 3 investment types
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Transit, Urban Infill",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Transit, Active Transportation",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Urban Infill, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Transit, Urban Infill, Active Transportation",
+      # 2 investment types
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Transit",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening, Urban Infill",
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Greening, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Transit, Urban Infill",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Transit, Active Transportation",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 1 ~
+        "Urban Infill, Active Transportation",
+      # single investments
+      total_stats_geo$greening == 1 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Greening",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 1 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 0 ~
+        "Transit",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 1 &
+        total_stats_geo$active_transportation == 0 ~
+        "Urban Infill",
+      total_stats_geo$greening == 0 &
+        total_stats_geo$transit == 0 &
+        total_stats_geo$urban_infill == 0 &
+        total_stats_geo$active_transportation == 1 ~
+        "Active Transportation",
+      TRUE ~ "No Investments"
+    )
+  )
+
+# ACS popups
+acs_popup <-
+  paste(
+    # Display Tract number
+    "Census Tract:", as.character(full_area_info$GEOID), "<br>",
+    
+    # Display non-white population
+    "Percent Non-white Population:",
+    scales::percent(full_area_info$pct_nonwhi_09, 4), "<br>",
+    
+    # Display college educated
+    "Percent College-Educated Population:",
+    scales::percent(full_area_info$pct_college_09, 4), "<br>",
+    
+    # Display renter occupied housing
+    "Percent Renter-Occupied Housing:",
+    scales::percent(full_area_info$pct_h_rent_09, 4), "<br>",
+    
+    # Display median rent
+    "Median Rent:",
+    scales::dollar(full_area_info$med_rent_09, 4), "<br>",
+    
+    # Display median income
+    "Median Income:",
+    scales::dollar(full_area_info$med_inc_09, 4)
+  )
 ```
 
 # Generate leaflet map
@@ -890,100 +1080,7 @@ my_map <-
   addPolygons(
     data = total_stats_geo,
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-        
-        # Display NOAH change
-        "% NOAH Change:", 
-        scales::percent(total_stats_geo$perc_noah_tot_change, 4), "<br>",
-        
-        # Display investment flags by type
-        "Investment Types: ", 
-        case_when(
-          # all 4
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Urban Infill, Active Transportation",
-          # 3 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Active Transportation",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Urban Infill, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Urban Infill, Active Transportation",
-          # 2 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit, Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Urban Infill, Active Transportation",
-          # single investments
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Active Transportation",
-          TRUE ~ "No Investments"
-        )
-      ),
+    popup = noah_popup,
     # set fill colors
     smoothFactor = 0,
     fillOpacity = .7,
@@ -1000,106 +1097,7 @@ my_map <-
     data = total_stats_geo,
    # set popups for geoid, data, investment type
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-        
-        # Display Average Outmigration Rates
-        "Average Total Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
-        "Average Low Income Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
-        "Average Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
-        "Average Low Income Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
-        
-        # Display investment flags by type
-        "Investment Types: ", 
-        case_when(
-          # all 4
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Urban Infill, Active Transportation",
-          # 3 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Active Transportation",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Urban Infill, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Urban Infill, Active Transportation",
-          # 2 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit, Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Urban Infill, Active Transportation",
-          # single investments
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Active Transportation",
-          TRUE ~ "No Investments"
-        )
-      ),
+    popup = outmigration_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
@@ -1115,106 +1113,7 @@ my_map <-
     data = total_stats_geo,
    # set popups for geoid, data, investment type
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-        
-        # Display Average Outmigration Rates
-        "Average Total Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
-        "Average Low Income Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
-        "Average Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
-        "Average Low Income Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
-        
-        # Display investment flags by type
-        "Investment Types: ", 
-        case_when(
-          # all 4
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Urban Infill, Active Transportation",
-          # 3 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Active Transportation",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Urban Infill, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Urban Infill, Active Transportation",
-          # 2 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit, Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Urban Infill, Active Transportation",
-          # single investments
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Active Transportation",
-          TRUE ~ "No Investments"
-        )
-      ),
+    popup = outmigration_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
@@ -1230,106 +1129,7 @@ my_map <-
     data = total_stats_geo,
    # set popups for geoid, data, investment type
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-        
-        # Display Average Outmigration Rates
-        "Average Total Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
-        "Average Low Income Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
-        "Average Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
-        "Average Low Income Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
-        
-        # Display investment flags by type
-        "Investment Types: ", 
-        case_when(
-          # all 4
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Urban Infill, Active Transportation",
-          # 3 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Active Transportation",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Urban Infill, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Urban Infill, Active Transportation",
-          # 2 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit, Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Urban Infill, Active Transportation",
-          # single investments
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Active Transportation",
-          TRUE ~ "No Investments"
-        )
-      ),
+    popup = outmigration_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
@@ -1345,106 +1145,7 @@ my_map <-
     data = total_stats_geo,
    # set popups for geoid, data, investment type
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-        
-        # Display Average Outmigration Rates
-        "Average Total Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
-        "Average Low Income Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
-        "Average Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
-        "Average Low Income Renter Outmigration Rate:",
-        scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
-        
-        # Display investment flags by type
-        "Investment Types: ", 
-        case_when(
-          # all 4
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Urban Infill, Active Transportation",
-          # 3 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Transit, Active Transportation",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Urban Infill, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Urban Infill, Active Transportation",
-          # 2 investment types
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Transit",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening, Urban Infill",
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Greening, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit, Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Transit, Active Transportation",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 1 ~
-            "Urban Infill, Active Transportation",
-          # single investments
-          total_stats_geo$greening == 1 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Greening",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 1 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 0 ~
-            "Transit",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 1 &
-            total_stats_geo$active_transportation == 0 ~
-            "Urban Infill",
-          total_stats_geo$greening == 0 &
-            total_stats_geo$transit == 0 &
-            total_stats_geo$urban_infill == 0 &
-            total_stats_geo$active_transportation == 1 ~
-            "Active Transportation",
-          TRUE ~ "No Investments"
-        )
-      ),
+    popup = outmigration_popup,
    smoothFactor = 0,
    fillOpacity = .7,
    weight = 0,
@@ -1454,201 +1155,81 @@ my_map <-
    highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
   ) %>%
   
-  ## Add Non-white population change ##############################
+  ## Add Non-white population ##############################
   addPolygons(
     # set population data
     data = full_area_info,
     # set popups for geoid, data
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-        
-        # Display non-white population change
-        "Percentage Point Non-white Population Change:",
-        scales::percent(full_area_info$pct_pnt_nonwhi_chng, 4), "<br>",
-        
-        # Display college educated change
-        "Percentage Point College Educated Population Change:",
-        scales::percent(full_area_info$pct_pnt_college_chng, 4), "<br>",
-        
-        # Display renter occupied housing change
-        "Percentage Point Renter-Occupied Housing Change:",
-        scales::percent(full_area_info$pct_pnt_h_rent_chng, 4), "<br>",
-        
-        # Display median rent change
-        "Median Rent Change:",
-        scales::dollar(full_area_info$med_rent_chng, 4), "<br>",
-        
-        # Display median income change
-        "Median Income Change:",
-        scales::dollar(full_area_info$med_inc_chng, 4)
-      ),
+    popup = acs_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
-    color = ~pal_nonwhi(pct_pnt_nonwhi_chng),
+    color = ~pal_nonwhi(pct_nonwhi_09),
     group = "Non-white Population",
     # bring shape to front on hover
     highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
   ) %>%
   
-  ## Add College population change #############################
+  ## Add College population #############################
   addPolygons(
     # set population data
     data = full_area_info,
     # set popups for geoid, data
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-        
-        # Display non-white population change
-        "Percentage Point Non-white Population Change:",
-        scales::percent(full_area_info$pct_pnt_nonwhi_chng, 4), "<br>",
-        
-        # Display college educated change
-        "Percentage Point College Educated Population Change:",
-        scales::percent(full_area_info$pct_pnt_college_chng, 4), "<br>",
-        
-        # Display renter occupied housing change
-        "Percentage Point Renter-Occupied Housing Change:",
-        scales::percent(full_area_info$pct_pnt_h_rent_chng, 4), "<br>",
-        
-        # Display median rent change
-        "Median Rent Change:",
-        scales::dollar(full_area_info$med_rent_chng, 4), "<br>",
-        
-        # Display median income change
-        "Median Income Change:",
-        scales::dollar(full_area_info$med_inc_chng, 4)
-      ),
+    popup = acs_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
-    color = ~pal_college(pct_pnt_college_chng),
+    color = ~pal_college(pct_college_09),
     group = "College Educated Population",
     # bring shape to front on hover
     highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
   ) %>%
   
-  ## Add renter-occupied housing change ##########################
+  ## Add renter-occupied housing ##########################
   addPolygons(
     # set population data
     data = full_area_info,
     # set popups for geoid, data
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-        
-        # Display non-white population change
-        "Percentage Point Non-white Population Change:",
-        scales::percent(full_area_info$pct_pnt_nonwhi_chng, 4), "<br>",
-        
-        # Display college educated change
-        "Percentage Point College Educated Population Change:",
-        scales::percent(full_area_info$pct_pnt_college_chng, 4), "<br>",
-        
-        # Display renter occupied housing change
-        "Percentage Point Renter-Occupied Housing Change:",
-        scales::percent(full_area_info$pct_pnt_h_rent_chng, 4), "<br>",
-        
-        # Display median rent change
-        "Median Rent Change:",
-        scales::dollar(full_area_info$med_rent_chng, 4), "<br>",
-        
-        # Display median income change
-        "Median Income Change:",
-        scales::dollar(full_area_info$med_inc_chng, 4)
-      ),
+    popup = acs_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
-    color = ~pal_renter(pct_pnt_h_rent_chng),
+    color = ~pal_renter(pct_h_rent_09),
     group = "Renter-Occupied Housing",
     # bring shape to front on hover
     highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
   ) %>%
   
-  ## Add median rent change ##################################
+  ## Add median rent ##################################
   addPolygons(
     # set population data
     data = full_area_info,
     # set popups for geoid, data
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-        
-        # Display non-white population change
-        "Percentage Point Non-white Population Change:",
-        scales::percent(full_area_info$pct_pnt_nonwhi_chng, 4), "<br>",
-        
-        # Display college educated change
-        "Percentage Point College Educated Population Change:",
-        scales::percent(full_area_info$pct_pnt_college_chng, 4), "<br>",
-        
-        # Display renter occupied housing change
-        "Percentage Point Renter-Occupied Housing Change:",
-        scales::percent(full_area_info$pct_pnt_h_rent_chng, 4), "<br>",
-        
-        # Display median rent change
-        "Median Rent Change:",
-        scales::dollar(full_area_info$med_rent_chng, 4), "<br>",
-        
-        # Display median income change
-        "Median Income Change:",
-        scales::dollar(full_area_info$med_inc_chng, 4)
-      ),
+    popup = acs_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
-    color = ~pal_medrent(med_rent_chng),
+    color = ~pal_medrent(med_rent_09),
     group = "Median Rent",
     # bring shape to front on hover
     highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
   ) %>%
   
-  ## Add median income change ##############################
+  ## Add median income ##############################
   addPolygons(
     # set population data
     data = full_area_info,
     # set popups for geoid, data
     # Set GEOID names and NOAH percentages
-    popup = 
-      paste(
-        # Display Tract number
-        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-        
-        # Display non-white population change
-        "Percentage Point Non-white Population Change:",
-        scales::percent(full_area_info$pct_pnt_nonwhi_chng, 4), "<br>",
-        
-        # Display college educated change
-        "Percentage Point College Educated Population Change:",
-        scales::percent(full_area_info$pct_pnt_college_chng, 4), "<br>",
-        
-        # Display renter occupied housing change
-        "Percentage Point Renter-Occupied Housing Change:",
-        scales::percent(full_area_info$pct_pnt_h_rent_chng, 4), "<br>",
-        
-        # Display median rent change
-        "Median Rent Change:",
-        scales::dollar(full_area_info$med_rent_chng, 4), "<br>",
-        
-        # Display median income change
-        "Median Income Change:",
-        scales::dollar(full_area_info$med_inc_chng, 4)
-      ),
+    popup = acs_popup,
     smoothFactor = 0,
     fillOpacity = .7,
     weight = 0,
-    color = ~pal_medinc(med_inc_chng),
+    color = ~pal_medinc(med_inc_09),
     group = "Median Income",
     # bring shape to front on hover
     highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
@@ -1681,7 +1262,7 @@ my_map <-
         "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
         
         # Display investment flags by type
-        "Investment Types: ", 
+        "Investment Type: ", 
         case_when(
           # all 4
           total_stats_geo$greening == 1 &
@@ -2657,12 +2238,12 @@ addLegend(
     group = "Outmigration LI Renter Study Areas"
   ) %>%
     
-  ## Add Non-white population change legend ###############################
+  ## Add Non-white population legend ###############################
   addLegend(
     "bottomleft",
     pal = pal_nonwhi,
-    values = full_area_info$pct_pnt_nonwhi_chng,
-    title = "Percentage Point Non-white Population Change 2009 - 2018",
+    values = full_area_info$pct_nonwhi_09,
+    title = "Percent Non-white Population 2009",
     labFormat =
       function(type, cuts, p) {  # Here's the trick
         paste0(nonwhi_labs)
@@ -2671,12 +2252,12 @@ addLegend(
     group = "Non-white Population"
   ) %>%
   
-  ## Add college population change legend ################################
+  ## Add college population legend ################################
   addLegend(
     "bottomleft",
     pal = pal_college,
-    values = full_area_info$pct_pnt_college_chng,
-    title = "Percentage Point College Educated Population Change 2009 - 2018",
+    values = full_area_info$pct_college_09,
+    title = "Percent College-Educated Population 2009",
     labFormat =
       function(type, cuts, p) {  # Here's the trick
         paste0(college_labs)
@@ -2685,12 +2266,12 @@ addLegend(
     group = "College Educated Population"
   ) %>%
   
-  ## Add renter occupied change legend ###############################
+  ## Add renter occupied legend ###############################
   addLegend(
     "bottomleft",
     pal = pal_renter,
-    values = full_area_info$pct_pnt_h_rent_chng,
-    title = "Percentage Point Renter-Occupied Housing Change 2009 - 2018",
+    values = full_area_info$pct_h_rent_09,
+    title = "Percent Renter-Occupied Housing 2009",
     labFormat =
       function(type, cuts, p) {  # Here's the trick
         paste0(renter_labs)
@@ -2699,12 +2280,12 @@ addLegend(
     group = "Renter-Occupied Housing"
   ) %>%
   
-  ## Add median rent change legend ##################################
+  ## Add median rent legend ##################################
   addLegend(
     "bottomleft",
     pal = pal_medrent,
-    values = full_area_info$med_rent_chng,
-    title = "Median Rent Change 2009 - 2018",
+    values = full_area_info$med_rent_09,
+    title = "Median Rent 2009",
     labFormat =
       function(type, cuts, p) {  # Here's the trick
         paste0(medrent_labs)
@@ -2713,12 +2294,12 @@ addLegend(
     group = "Median Rent"
   ) %>%
   
-  ## Add median income change legend ##################################
+  ## Add median income legend ##################################
   addLegend(
     "bottomleft",
     pal = pal_medinc,
-    values = full_area_info$med_inc_chng,
-    title = "Median Income Change 2009 - 2018",
+    values = full_area_info$med_inc_09,
+    title = "Median Income 2009",
     labFormat =
       function(type, cuts, p) {  # Here's the trick
         paste0(medinc_labs)
@@ -2750,7 +2331,8 @@ addLegend(
 
 # Save map to html
 ```{r}
-htmlwidgets::saveWidget(my_map, "map_draftFinal3.html", selfcontained = FALSE)
+#htmlwidgets::saveWidget(my_map, "map_draftFinal3.html", selfcontained = FALSE)
+htmlwidgets::saveWidget(my_map, "baseline_map_final.html", selfcontained = FALSE)
 ```
 
 * NOTE: could not save as self-contained - my (Matt's) laptop does not have enough memory to handle it
@@ -2800,7 +2382,7 @@ addPolygons(
       scales::percent(total_stats_geo$perc_noah_tot_change, 4), "<br>",
       
       # Display investment flags by type
-      "Investment Types: ", 
+      "Investment Type: ", 
       case_when(
         # all 4
         total_stats_geo$greening == 1 &
