@@ -1,0 +1,45 @@
+---
+title: "tract_characteristics_convert"
+author: "Matt Alvarez-Nissen"
+date: "July 3, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(rio)
+
+# Files
+## .dta files
+acs_tract_09_file <-
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2009_tract_CA_mani.dta"
+
+acs_tract_10_file <-
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2010_tract_CA_mani.dta"
+
+acs_tract_13_file <-
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2013_tract_CA_mani.dta"
+
+acs_tract_16_file <-
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2016_tract_CA_mani.dta"
+
+acs_tract_18_file <-
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2018_tract_CA_mani.dta"
+
+census_tract_00_file <- 
+  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/Census_2000_tract_CA_mani.dta"
+```
+
+# Convert .dta tract characteristics data to .csv
+```{r}
+convert(acs_tract_09_file , "./SGC/acs_tract_09.csv")
+convert(acs_tract_10_file , "./SGC/acs_tract_10.csv")
+convert(acs_tract_10_file , "./SGC/acs_tract_13.csv")
+convert(acs_tract_16_file , "./SGC/acs_tract_16.csv")
+convert(acs_tract_18_file , "./SGC/acs_tract_18.csv")
+convert(census_tract_00_file , "./SGC/census_tract_00.csv")
+```
