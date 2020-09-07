@@ -264,7 +264,9 @@ vars_00 <-
 vars_09 <-
   total_reg_df %>% 
   select(matches("_09")) %>% 
-  select(-matches("noah")) %>% 
+  select(-matches("noah")) %>%
+  # remove variables used in PSM
+  select(-c(pct_whi_09, pct_h_rent_09, med_rent_09, pct_college_09)) %>% 
   names() %>% 
   paste(collapse = " + ")
 ```
