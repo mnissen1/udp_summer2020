@@ -38,7 +38,6 @@ psm_matched_sf_path <- "./SGC/psm_matched_sf.csv"
 psm_matched_fresno_path <- "./SGC/psm_matched_fresno.csv"
 ```
 
-# NOTE: CODE/FINAL CSV STILL USES DUMMY MOBILITY MEASUREMENT
 # Read in 2009 investments
 ```{r}
 neighborhood_test <- read_csv(nbr_traits_09_file)
@@ -101,6 +100,7 @@ abs_std_diff_finder <- function(data, cov) {
 }
 ```
 
+## Generate cov_table
 ```{r, eval=FALSE}
 # create a list of results for each covariate grouping in LA
 diffs <- c()
