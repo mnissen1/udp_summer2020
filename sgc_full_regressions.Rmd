@@ -303,7 +303,7 @@ stargazer::stargazer(
   perc_noah_00_reg,
   perc_pnt_noah_00_reg, 
   unit_noah_00_reg,
-  type = "text",
+  type = "html",
   title = "NOAH Change 2000 - 2009 in Total Area",
   font.size = "small",
   column.sep.width = "1pt",
