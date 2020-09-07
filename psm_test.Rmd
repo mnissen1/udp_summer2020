@@ -182,7 +182,7 @@ cov_table %>%
 neighborhood_cov <-
   cov_table %>% 
   # filter to "raw" (or covariate list of choice)
-  filter(case == "base_case_plus") %>% 
+  filter(case == "base_case") %>% 
   mutate(cov = str_remove_all(cov, '\\"')) %>% 
   # select for list of covariates
   select(cov) %>% 

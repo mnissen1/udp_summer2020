@@ -161,9 +161,7 @@ geo_dif <-
 ```{r}
 master_09_df <-
   master_df %>% 
-  left_join(acs_tract_09_xwalk, by = "GEOID") %>% 
-  # remove the beginning "2000_"
-  rename_with(~ str_remove(., "^2000_"), starts_with("2000_"))
+  left_join(acs_tract_09_xwalk, by = "GEOID")
 ```
 
 # Filter 2018 ACS data to tracts in master_df
@@ -195,35 +193,15 @@ master_09_df <-
   master_09_df %>% 
   # Generate baseline study variables
   mutate(
-    # total pop in 2009
-    pop_tot_09 = pop_tot,
-    # % nonwhites in 2009
-    pct_nonwhi_09 = 1 - pct_whi,
     # pop nonwhites in 2009
-    pop_nonwhi_09 = pop_tot_09 - pop_whi_nonhis,
-    # pop poverty in 2009
-    pop_pov_09 = pop_pov_pov,
+    pop_nonwhi_09 = pop_tot_09 - pop_whi_nonhis_09,
+    # percent nonwhites in 2009
+    pct_nonwhi_09 = pop_nonwhi_09 / pop_tot_09,
     # % poverty in 2009
-    pct_pov_09 = pov_rate,
-    # median hh income in 2009
-    med_inc_09 = med_inc,
-    # no. of vacant housing units in 2009
-    housing_vac_09 = housing_vac,
+    pct_pov_09 = pov_rate_09,
     # % vacant housing units in 2009
-    pct_housing_vac_09 = vac_rate,
-    # no. of renter occupied housing units in 2009
-    h_rent_09 = housing_o_rent,
-    # % renter occupied in 2009
-    pct_h_rent_09 = pct_h_rent,
-    # median gross rent in 2009
-    med_rent_09 = med_rent,
-    # pop college-educated in 2009
-    pop_college_09 = pop_college,
-    # % college-educated in 2009
-    pct_college_09 = pct_college
+    pct_housing_vac_09 = vac_rate_09,
   ) %>% 
-  # filter to only relevant variables
-  select(c(GEOID:n_invest, pop_tot_09:pct_college_09)) %>% 
   # join with filtered 2018 ACS data
   left_join(acs_tract_18_filter, by = c("GEOID" = "stctytrct")) %>% 
   # generate change over time study variables
@@ -236,7 +214,7 @@ master_09_df <-
     # pct point change in poverty rate (2009 to 2018)
     pct_pnt_pov_chng = pov_rate - pct_pov_09,
     # pct population change in poverty (2009 to 2018)
-    pct_pop_pov_chng = (pop_pov_pov - pop_pov_09) / pop_pov_09,
+    pct_pop_pov_chng = (pop_pov_pov - pop_pov_pov_09) / pop_pov_pov_09,
     # change in median hh income (2009 to 2018)
     med_inc_chng = med_inc - med_inc_09,
     # pct change in median hh income (2009 to 2018)
@@ -248,7 +226,7 @@ master_09_df <-
     # pct pnt change in renter-occupied units (2009 to 2018)
     pct_pnt_h_rent_chng = pct_h_rent - pct_h_rent_09,
     # pct change in renter-occupied units (2009 to 2018)
-    pct_h_rent_chng = (housing_o_rent - h_rent_09) / h_rent_09,
+    pct_h_rent_chng = (housing_o_rent - housing_o_rent_09) / housing_o_rent_09,
     # change in median gross rent (2009 to 2018)
     med_rent_chng = med_rent - med_rent_09,
     # % change in median gross rent (2009 to 2018
@@ -257,8 +235,7 @@ master_09_df <-
     pct_pnt_college_chng = pct_college - pct_college_09,
     # pct population change in college-educated (2009 to 2018)
     pct_pop_college_chng = (pop_college - pop_college_09) / pop_college_09
-  ) %>%
-  select(c(GEOID:pct_college_09, pct_pnt_nonwhi_chng:pct_pop_college_chng)) %>% 
+  ) %>% 
   # Replace all "Inf" values with NA
   mutate(across(.cols = everything(), na_if, Inf))
 ```

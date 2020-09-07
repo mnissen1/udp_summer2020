@@ -25,7 +25,13 @@ area_psm <- function(psm_df) {
       perc_noah_nolihtc_change = noah_nolihtc_change / noah_nolihtc_clean_09
     ) %>% 
     # clean up the data
-    select(-c(rowname, pct_pnt_nonwhi_chng:pct_pop_college_chng)) %>% 
+    select(
+      GEOID:n_invest, 
+      contains("noah"), 
+      contains("num_out"),
+      contains("num_fams"),
+      contains("outmigration_")
+    ) %>% 
     # convert Inf to NA
     mutate(across(.cols = everything(), na_if, Inf)) %>% 
     # join with outmigration data
@@ -283,6 +289,17 @@ outmigration_time <- function(area_stats, area_psm) {
       names_to = "type",
       values_to = "migration_rate"
     ) %>% 
+    # change factor levels for better plot
+    mutate(
+      type = 
+        fct_relevel(
+          type, 
+          "outmigration_all",
+          "outmigration_LI", 
+          "outmigration_renters",
+          "outmigration_LI_renters"
+        )
+    ) %>% 
     # extract the year digits
     mutate(
       year = str_extract(type, "\\d{4}$"),
@@ -292,6 +309,8 @@ outmigration_time <- function(area_stats, area_psm) {
       type = str_to_title(type),
       type = str_replace(type, "Li", "Low Income")
     ) %>%
+    #change factor levels for better plot
+    mutate(type = as_factor(type)) %>% 
     # plot outmigration over time
     ggplot(
       aes(x = year, y = migration_rate, color = investment, group = investment)
@@ -349,10 +368,22 @@ outmigration_bar <- function(area_stats, area_psm) {
     ) %>% 
     group_by(investment, type) %>% 
     summarise(migration_rate = mean(migration_rate)) %>% 
+    #change factor levels for better plot
+    mutate(
+      type = as_factor(type),
+      type = 
+        fct_relevel(
+          type, 
+          "outmigration_all",
+          "outmigration_LI",
+          "outmigration_renters",
+          "outmigration_LI_renters"
+        )
+    ) %>% 
     ggplot(aes(x = type, y = migration_rate, fill = investment)) +
     geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
     scale_x_discrete(
-      labels = c("All", "Low Income", "Low Income Renters", "Renters")
+      labels = c("All", "Low Income", "Renters", "Low Income Renters")
     ) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     scale_fill_discrete(labels = c("No Investment", "Investment")) +
@@ -565,6 +596,19 @@ outmigration_type_time <- function(area_stats, area_psm) {
       type = str_to_title(type),
       type = str_replace(type, "Li", "Low Income")
     ) %>%
+    #change factor levels for better plot
+    mutate(
+      type = as_factor(type),
+      type = 
+        fct_relevel(
+          type, 
+          "All",
+          "Low Income",
+          "Renters",
+          "Low Income Renters"
+        )
+      
+    ) %>% 
     # plot outmigration over time
     ggplot(
       aes(x = year, y = migration_rate, color = investment, group = investment)
@@ -631,12 +675,24 @@ outmigration_type_bar <- function(area_stats, area_psm) {
     # need to group by investment type and outmigration type
     group_by(.dots = investment_type, type) %>% 
     summarise(migration_rate = mean(migration_rate)) %>% 
+    #change factor levels for better plot
+    mutate(
+      type = as_factor(type),
+      type = 
+        fct_relevel(
+          type, 
+          "outmigration_all",
+          "outmigration_LI",
+          "outmigration_renters",
+          "outmigration_LI_renters"
+        )
+    ) %>% 
     ggplot(
       aes_string(x = "type", y = "migration_rate", fill = investment_type)
     ) +
     geom_col(position = position_dodge2(padding = 0, reverse = TRUE)) +
     scale_x_discrete(
-      labels = c("All", "Low Income", "Low Income Renters", "Renters")
+      labels = c("All", "Low Income", "Renters", "Low Income Renters")
     ) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     scale_fill_discrete(labels = c("No Investment", "Investment")) +

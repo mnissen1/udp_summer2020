@@ -1,7 +1,7 @@
 ---
 title: "SGC Full Regressions"
 author: "Matt Alvarez-Nissen"
-date: "8/17/2020"
+date: "9/6/2020"
 output:
   html_document:
     toc: true
@@ -135,7 +135,7 @@ total_reg_df <-
   # reorder columns
   select(GEOID, investment, la_flag, sf_flag, everything()) %>% 
   # join with census tract data
-  left_join(all_years_tract_ca, by = "GEOID") %>% 
+  left_join(all_years_tract_ca) %>% 
   # join with 2000 NOAH data
   left_join(noah_00_xwalk, by = "GEOID") %>% 
   # rename total NOAH change variables
@@ -303,7 +303,7 @@ stargazer::stargazer(
   perc_noah_00_reg,
   perc_pnt_noah_00_reg, 
   unit_noah_00_reg,
-  type = "html",
+  type = "text",
   title = "NOAH Change 2000 - 2009 in Total Area",
   font.size = "small",
   column.sep.width = "1pt",
@@ -362,7 +362,7 @@ stargazer::stargazer(
 ## create string of dependent variables
 ivs_00 <-
   paste(
-    "investment + la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
+    "la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
     vars_00
   )
 
@@ -409,7 +409,7 @@ stargazer::stargazer(
 ## create string of dependent variables
 ivs_09 <-
   paste(
-    "investment + la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
+    "la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
     vars_09
   )
 
@@ -698,7 +698,7 @@ stargazer::stargazer(
 ## create string of dependent variables
 ivs_00 <-
   paste(
-    "investment + greening + transit + urban_infill + active_transportation +",
+    "greening + transit + urban_infill + active_transportation +",
     vars_00
   )
 
@@ -822,7 +822,7 @@ stargazer::stargazer(
 ## create string of dependent variables
 ivs_09 <-
   paste(
-    "investment + greening + transit + urban_infill + active_transportation +",
+    "greening + transit + urban_infill + active_transportation +",
     vars_09
   )
 

@@ -1,0 +1,135 @@
+---
+title: "acs_crosswalk"
+author: "Matt Alvarez-Nissen"
+date: "July 6, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+
+# Files
+acs_tract_09_file <- "./SGC/acs_tract_09.csv"
+
+crosswalk_00_10_file <- "./SGC/crosswalk_2000_2010.csv"
+
+# Parameters
+acs_tract_09_xwalk_path <- "./SGC/acs_tract_09_xwalk.csv"
+```
+
+# Check for tract changes - will need to crosswalk
+```{r}
+# check for difference
+study_tracts_10 <-
+  tracts(
+    state = "CA",
+    county = c("Los Angeles", "Fresno", sf_bay_area),
+    year = 2010
+  ) %>% 
+  st_as_sf() %>% 
+  select(GEOID = GEOID10, geometry)
+
+study_tracts_00 <-
+  tracts(
+    state = "CA",
+    county = c("Los Angeles", "Fresno", sf_bay_area),
+    year = 2000
+  ) %>% 
+  st_as_sf() %>% 
+  select(GEOID = CTIDFP00, geometry)
+
+setequal(study_tracts_00$GEOID, study_tracts_10$GEOID)
+# Tracts have changed, need to crosswalk
+```
+
+# Read in 2009 ACS data and crosswalk file
+```{r}
+acs_tract_09 <- 
+  read_csv(acs_tract_09_file)
+
+crosswalk_00_10 <-
+  read_csv(crosswalk_00_10_file, col_types = cols(.default = "c"))
+```
+
+# Crosswalk 2009 ACS to 2010 boundaries 
+# (for later comparison to 2018 ACS tracts)
+## Filter crosswalk to relevant tract IDs
+### Use crosswalk filter from Brown University Diversity and Disparities
+### https://s4.ad.brown.edu/projects/diversity/Researcher/LTBDDload/DataList.aspx
+```{r}
+# Create list of FIPS from ACS data to filter on
+fips_filter <-
+  paste(acs_tract_09$stctytrct, collapse = "|")
+
+# Filter crosswalk data by relevant FIPS
+crosswalk_filter <-
+  crosswalk_00_10 %>% 
+  filter(str_detect(trtid00, fips_filter))
+```
+
+## Interpolate 2000 boundary data to 2010 tracts
+```{r}
+acs_tract_09_xwalk <-
+  acs_tract_09 %>% 
+  # rename full FIPS code for a join
+  rename(trtid00 = stctytrct) %>% 
+  # join to filtered crosswalk
+  full_join(crosswalk_filter, by = "trtid00") %>% 
+  # change weight from character to numeric type
+  mutate(weight = as.numeric(weight)) %>% 
+  # multiply all data by its weight
+  mutate(
+    across(
+      # select all ACS data
+      pop_tot:pct_college,
+      # find value of data multiplied by weight
+      ~ . * weight, 
+      # attach name in the following pattern
+      .names = "{col}_09"
+    )
+  ) %>% 
+  # select for relevant variables (2010 tracts)
+  select(trtid10, ends_with("_09")) %>% 
+  # group by 2010 tracts
+  group_by(trtid10) %>% 
+  # sum up all variables
+  summarise_all(sum) %>% 
+  # rename trtid10 to GEOID
+  rename(GEOID = trtid10) %>% 
+  # remove faulty percentages and rates
+  select(-contains("pct_")) %>% 
+  select(-contains("rate_")) %>% 
+  # recalculate percentages and rates for relevant variables
+  mutate(
+    # percent white
+    pct_whi_09 = pop_whi_nonhis_09 / pop_tot_09,
+    # percent black
+    pct_blk_09 = pop_blk_nonhis_09 / pop_tot_09,
+    # percent asian
+    pct_asn_09 = pop_asn_nonhis_09 / pop_tot_09,
+    # percent hispanic
+    pct_hisp_09 = pop_hisp_09 / pop_tot_09,
+    # poverty rate
+    pov_rate_09 = pop_pov_pov_09 / pop_pov_tot_09,
+    # rate of housing vacancy
+    vac_rate_09 = housing_vac_09 / housing_tot_09,
+    # percent renter occupied
+    pct_h_rent_09 = housing_o_rent_09 / housing_occ_09,
+    # percent college educated
+    pct_college_09 = pop_college_09 / pop_25over_09
+  )
+
+acs_tract_09_xwalk %>% 
+  select(pct_whi_09) %>% 
+  arrange(desc(pct_whi_09))
+```
+
+# Write crosswalked data to CSV
+```{r}
+acs_tract_09_xwalk %>% 
+  write_csv(acs_tract_09_xwalk_path)
+```
