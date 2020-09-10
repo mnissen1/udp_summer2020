@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# Set working directory
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
 ```{r}
@@ -23,7 +25,7 @@ nbr_traits_09_file <- "./SGC/master_investments_09.csv"
 
 # Parameters
 ## Source functions
-source('psm_funcs.R')
+source('./Support Code/psm_funcs.R')
 
 ## Path for final covariate table
 cov_table_path <- "./SGC/cov_table.csv"

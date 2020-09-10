@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# Set working directory
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 ```
 
 ```{r}
@@ -16,22 +18,22 @@ library(rio)
 # Files
 ## .dta files
 acs_tract_09_file <-
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2009_tract_CA_mani.dta"
+  "./SGC/tract characteristics/ACS_2009_tract_CA_mani.dta"
 
 acs_tract_10_file <-
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2010_tract_CA_mani.dta"
+  "./SGC/tract characteristics/ACS_2010_tract_CA_mani.dta"
 
 acs_tract_13_file <-
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2013_tract_CA_mani.dta"
+  "./SGC/tract characteristics/ACS_2013_tract_CA_mani.dta"
 
 acs_tract_16_file <-
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2016_tract_CA_mani.dta"
+  "./SGC/tract characteristics/ACS_2016_tract_CA_mani.dta"
 
 acs_tract_18_file <-
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/ACS_2018_tract_CA_mani.dta"
+  "./SGC/tract characteristics/ACS_2018_tract_CA_mani.dta"
 
 census_tract_00_file <- 
-  "E:/UDP_2020/udp_summer2020/SGC/tract characteristics/Census_2000_tract_CA_mani.dta"
+  "./SGC/tract characteristics/Census_2000_tract_CA_mani.dta"
 ```
 
 # Convert .dta tract characteristics data to .csv
