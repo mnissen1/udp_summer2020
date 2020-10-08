@@ -10,7 +10,7 @@ I was responsible for matching neighborhoods with investments to neighborhoods w
 # Propensity Score Matching
 The results of the propensity score matching (PSM) can be found [here](https://github.com/mnissen1/udp_summer2020/tree/master/writeups/sgc_psm_writeup.pdf).
 
-PSM is a statistical matching technique that matches control and treatment observations based similar "propensity scores", which is a balancing score derived from selected covariates. Covariates in this case were selected after running through the process multiple times and selecting the grouping with the lowest Average Absolute Standardized Difference. Goodness-of-fit for these results can be seen [here](https://github.com/mnissen1/udp_summer2020/tree/master/visualizations/psm_tests).
+PSM is a statistical matching technique that matches control and treatment observations based on similar "propensity scores", which is a balancing score derived from selected covariates. Covariates in this case were selected after running through the process multiple times and selecting the grouping with the lowest Average Absolute Standardized Difference. Goodness-of-fit for these results can be seen [here](https://github.com/mnissen1/udp_summer2020/tree/master/visualizations/psm_tests).
 
 # Full Regressions
 The results of the full regression models can be found [here](https://mnissen1.github.io/udp_summer2020/writeups/sgc_reg_full.html). They are still a work in progress, especially the fixed effects models. These will be updated once a more definite "beginning year" is determined for each variable.
