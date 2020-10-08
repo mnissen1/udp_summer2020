@@ -1,34 +1,72 @@
----
-title: "investment neighborhood match"
-author: "Matt Alvarez-Nissen"
-date: "June 27, 2020"
-output: html_document
----
+# -------------------------------------------------------------------------
+# Created by: Matt Alvarez-Nissen                         
+# Date created: Jun. 27, 2020                
+# Last revised: Oct. 7, 2020                 
+# Project: UDP SGC     
+# Subproject: Propensity Score Matching
+# Re: Match investments to neighborhoods (Census tracts)
+# -------------------------------------------------------------------------
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-# Set working directory
-knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
-```
+# Script Description ------------------------------------------------------
 
-```{r}
+# This script matches the geospatial data of SGC investments to 2010 Census
+# tract boundaries, and attaches tract IDs to each investment. 
+
+# Inputs:
+# Raw investment spatial data
+# Lookup tables for investments
+
+# Outputs:
+# Investments paired with Census tracts
+# Cleaned investment lookup tables
+
+# Update log: 
+# 10/6/20 - converted from RMarkdown to R script for faster processing.
+
+# Setup -------------------------------------------------------------------
+
+# Packages: 
 library(tidyverse)
 library(glue)
 library(tidycensus)
 library(tigris)
 library(sf)
 
-# Files
-dir <- "./SGC/Spatial Data 06_26_2020"
-shp_list <- list.files(dir, pattern = "\\.shp$", full.names = TRUE)
+# Directories: 
+homedir <- "E:/udp_summer2020/"
+workdir <- "sgc_data/raw/"
+savedir <- "sgc_data/cleaned/"
+spatial_dir <- "Spatial Data 06_26_2020/"
+setwd(homedir)
 
-investment_lookup_file <- "./SGC/investment_lookup.csv"
+# Import data:
+# Create list of investment shapefiles (importation done in main script)
+shp_list <- 
+  list.files(
+    paste0(homedir, workdir, spatial_dir), 
+    pattern = "\\.shp$", 
+    full.names = TRUE
+  )
 
-investment_database_file <- "./SGC/Investment Selection.xlsx"
+# Read in lookup table
+# investment_lookup <-
+#   read_csv(paste0(homedir, workdir, "investment_lookup.csv")) %>%
+#   arrange(FolderPath)
 
-intervention_flags_file <- "./SGC/intervention_flags.csv"
+# Read in investment database (sheet 1)
+investment_database <-
+  readxl::read_excel(
+    paste0(homedir, 
+           workdir, 
+           "Investment Selection.xlsx"
+    ), 
+    sheet = 1
+  )
 
-# Parameters
+
+# intervention_flags_file <- "./SGC/intervention_flags.csv"
+
+# Parameters:
 ## file paths to delete (delete points if polygon version exists)
 delete_list <-
   c(
@@ -51,23 +89,26 @@ delete_list <-
 ## group of SF Bay counties
 sf_bay_area <- 
   c(
-    "Alameda", "Contra Costa", "Marin", "Napa", "Sacramento", "san Francisco", "San Joaquin", "San Mateo", "Santa Clara", "Santa Cruz", "Solano", "Yolo"          )
+    "Alameda", "Contra Costa", "Marin", "Napa", "Sacramento", "san Francisco",
+    "San Joaquin", "San Mateo", "Santa Clara", "Santa Cruz", "Solano", "Yolo" 
+  )
 
 ## path for individual and investment group lookup
-investment_lookup_path <- "./SGC/investment_lookup.csv"
-
-## path for intervention group flags
-intervention_flags_path <- "./SGC/intervention_flags.csv"
-
-## path for final CSV
-investment_tract_path <- "./SGC/investment_tract.csv"
+# investment_lookup_path <- "./SGC/investment_lookup.csv"
+# 
+# ## path for intervention group flags
+# intervention_flags_path <- "./SGC/intervention_flags.csv"
+# 
+# ## path for final CSV
+# investment_tract_path <- "./SGC/investment_tract.csv"
 
 ## Study year for Census geography
 census_year <- 2010
-```
 
-# Filter shp_list
-```{r}
+# Main Script ------------------------------------------------------------------
+
+# Filter shp_list--------------------------------------------------------------
+
 # delete points from consideration
 # definitely not the most elegant solution...
 shp_list <-
@@ -76,7 +117,7 @@ shp_list <-
   tibble(full = .) %>% 
   mutate(
     # extract just the name
-    short = str_remove(full, dir),
+    short = str_remove(full, paste0(homedir, workdir, spatial_dir)),
     short = str_remove(short, "/"),
     short = str_remove(short, ".shp"),
     # create flag if name is in delete list
@@ -86,10 +127,9 @@ shp_list <-
   filter(delete_flag == FALSE) %>% 
   # return to list format
   pull(full)
-```
 
-# Read in all shp
-```{r}
+# Read in all shp--------------------------------------------------------------
+
 # write all investments to a list
 invest_list <-
   shp_list %>% 
@@ -124,10 +164,8 @@ for (i in 1:length(invest_list)) {
       st_as_sf()
   }
 }
-```
 
 # Investigate "missing" indexes
-```{r}
 # see which are missing
 shp_list[missing]
 
@@ -158,10 +196,8 @@ for (i in 1:length(missing)) {
     rbind(missing_filter) %>% 
     st_as_sf()
 }
-```
 
-# Create final investment filtered df
-```{r}
+# Create final investment filtered df-------------------------------------------
 # bind invest_filter and missing_filter
 final_invest_filter <-
   invest_filter %>%
@@ -190,29 +226,25 @@ final_invest_filter <-
 final_invest_filter %>% 
   count(FolderPath) %>% 
   tibble()
-# Check passed! - El Monte doubles up
-```
 
-# Create lookup table for individual projects and investment group
-```{r}
-# write lookup table to folder for later use
-final_invest_filter %>% 
+# Check passed! - El Monte doubles up
+
+# Remove unneeded objects
+rm(invest_filter, invest_list, missing_filter)
+
+# Create intervention group list -----------------------------------------------
+
+# Create investment lookup table
+investment_lookup <-
+  final_invest_filter %>% 
   st_drop_geometry() %>% 
   select(Name, FolderPath) %>% 
   distinct() %>% 
-  write_csv(path = investment_lookup_path)
-```
-
-# Create intervention group list
-```{r}
-# Read in lookup table
-investment_lookup <-
-  read_csv(investment_lookup_file) %>%
   arrange(FolderPath)
 
-# Read in investment database (sheet 1)
-investment_database <-
-  readxl::read_xlsx(investment_database_file, sheet = 1) %>%
+# Clean investment database
+investment_database_clean <-
+  investment_database %>%
   # Filter to relevant investments
   filter(
     Investment %in%
@@ -238,7 +270,7 @@ investment_database <-
         "Metro Willowbrook/Rosa Parks Station Improvements"
       )
   ) %>%
- # select for relevant columns
+  # select for relevant columns
   select(
     investment = Investment,
     intervention_group = `Intervention Group`,
@@ -277,7 +309,7 @@ investment_database <-
   arrange(investment)
 
 # create new lookup table
-new_investment_lookup <-
+investment_lookup_new <-
   investment_lookup %>%
   select(FolderPath) %>%
   distinct() %>%
@@ -285,14 +317,14 @@ new_investment_lookup <-
   # remove duplicated El Monte
   filter(FolderPath != "El Monte Transit Village Polygon") %>%
   # bind to investment database
-  bind_cols(investment_database) %>%
+  bind_cols(investment_database_clean) %>%
   select(-investment)
 
 # fill out original lookup table
-investment_lookup <-
+investment_lookup_clean <-
   investment_lookup %>%
   # reattach to original lookup table
-  left_join(new_investment_lookup, by = "FolderPath") %>%
+  left_join(investment_lookup_new, by = "FolderPath") %>%
   # fill in the missing El Monte data
   mutate(
     intervention_group =
@@ -317,28 +349,22 @@ investment_lookup <-
       if_else(str_detect(intervention_group, "active transportation"), 1, 0),
     transit = if_else(str_detect(intervention_group, "transit"), 1, 0)
   )
-```
 
-# Write intervention flags to new CSV
-```{r}
-# write for later use
-write_csv(investment_lookup, intervention_flags_path)
-```
-
-# Read in intervention flags and join to final_invest_filter
-```{r}
-intervention_flags <- 
-  read_csv(intervention_flags_file) %>% 
-  select(Name, greening, urban_infill, active_transportation, transit)
+# remove unneeded objects
+rm(investment_database, investment_database_clean, 
+   investment_lookup, investment_lookup_new)
 
 # Join to final investment filter
 final_invest_filter <-
   final_invest_filter %>% 
-  left_join(intervention_flags, by = "Name")
-```
+  left_join(
+    investment_lookup_clean %>% 
+      select(Name, greening, urban_infill, active_transportation, transit),
+    by = "Name"
+  )
 
-# Read in Census tracts for LA, Fresno, SF Bay Area
-```{r}
+# Read in Census tracts for LA, Fresno, SF Bay Area----------------------------
+
 # Use Census 2010 (will crosswalk ACS data)
 study_tracts <-
   tracts(
@@ -347,15 +373,11 @@ study_tracts <-
     year = census_year
   ) %>% 
   st_as_sf() %>% 
-  select(GEOID = GEOID10, geometry)
-```
-
-# Intersect tracts with investments
-```{r}
-#set both to same projection
-study_tracts <-
-  study_tracts %>% 
+  select(GEOID = GEOID10, geometry) %>% 
+  # set to correct projection
   st_transform(crs = st_crs(final_invest_filter))
+
+# Intersect tracts with investments--------------------------------------------
 
 # join using intersects
 invest_join <- 
@@ -369,10 +391,8 @@ invest_join <-
 # Check invest join
 invest_join %>% 
   arrange(FolderPath)
-```
 
-# tidy the data
-```{r}
+# tidy the data ---------------------------------------------------------------
 invest_join_tidy <-
   invest_join %>% 
   select(GEOID, everything()) %>%
@@ -404,9 +424,17 @@ invest_join_tidy <-
   st_drop_geometry() %>% 
   # ungroup from GEOID
   ungroup()
-```
 
-# write tidy data to new csv
-```{r}
-write_csv(invest_join_tidy, investment_tract_path)
-```
+# Remove unneeded objects
+rm(study_tracts, investment_lookup_clean, invest_join)
+
+# Save Results ------------------------------------------------------------
+
+# write investment lookup table to csv
+write_csv(final_invest_filter, paste0(homedir, savedir, "investment_lookup.csv"))
+
+# write matched investments to new csv
+write_csv(invest_join_tidy, paste0(homedir, savedir, "investment_tract.csv"))
+
+# Clean up environment
+rm(list = ls())

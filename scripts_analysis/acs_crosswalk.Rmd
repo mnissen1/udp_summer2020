@@ -13,6 +13,7 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 
 ```{r}
 library(tidyverse)
+library(tigris)
 
 # Files
 acs_tract_09_file <- "./SGC/acs_tract_09.csv"
