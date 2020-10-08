@@ -63,9 +63,6 @@ investment_database <-
     sheet = 1
   )
 
-
-# intervention_flags_file <- "./SGC/intervention_flags.csv"
-
 # Parameters:
 ## file paths to delete (delete points if polygon version exists)
 delete_list <-
@@ -92,15 +89,6 @@ sf_bay_area <-
     "Alameda", "Contra Costa", "Marin", "Napa", "Sacramento", "san Francisco",
     "San Joaquin", "San Mateo", "Santa Clara", "Santa Cruz", "Solano", "Yolo" 
   )
-
-## path for individual and investment group lookup
-# investment_lookup_path <- "./SGC/investment_lookup.csv"
-# 
-# ## path for intervention group flags
-# intervention_flags_path <- "./SGC/intervention_flags.csv"
-# 
-# ## path for final CSV
-# investment_tract_path <- "./SGC/investment_tract.csv"
 
 ## Study year for Census geography
 census_year <- 2010

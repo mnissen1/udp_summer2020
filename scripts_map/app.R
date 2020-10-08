@@ -28,6 +28,7 @@ library(tigris)
 library(htmlwidgets)
 library(leaflet)
 library(shiny)
+library(shinycssloaders)
 options(tigris_use_cache = TRUE)
 
 # Directories: 
@@ -76,7 +77,7 @@ epsg <- 4326
 
 # Main Code -----------------------------------------------------------------
 
-# Read in overlay data ------------------------------------------------------
+  ## Read in overlay data ------------------------------------------------------
 # Total Stats Geo
 total_stats_geo <- 
   st_read(total_stats_geo_file) %>% 
@@ -143,7 +144,7 @@ shp_list <-
   tibble(full = .) %>% 
   mutate(
     # extract just the name
-    short = str_remove(full, spatialdir),
+    short = str_remove(full, paste0(homedir, workdir, spatialdir)),
     short = str_remove(short, "/"),
     short = str_remove(short, ".shp"),
     # create flag if name is in delete list
@@ -1401,10 +1402,9 @@ fresno_markers <- function(prior) {
     )
 }
 
-
-
 # Set up UI -------------------------------------------------------------------
 ui <- fluidPage(
+  
   # enable Shinyjs for disabling feature
   shinyjs::useShinyjs(),
   
@@ -1894,7 +1894,7 @@ server <- function(input, output, session) {
         layerId = noah_clear,
         # bring shape to front on hover
         highlightOptions =
-          highlightOptions(opacity = 0, bringToFront = FALSE)
+          highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add average area NOAH legend###################
@@ -1988,7 +1988,7 @@ server <- function(input, output, session) {
         group = "Outmigration All Study Areas",
         layerId = outmig_all_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration all legend###################
@@ -2073,7 +2073,7 @@ server <- function(input, output, session) {
         group = "Outmigration LI Study Areas",
         layerId = outmig_li_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration LI legend###################
@@ -2158,7 +2158,7 @@ server <- function(input, output, session) {
         group = "Outmigration Renter Study Areas",
         layerId = outmig_r_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration renter legend###################
@@ -2243,7 +2243,7 @@ server <- function(input, output, session) {
         group = "Outmigration LI Renter Study Areas",
         layerId = outmig_li_r_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration LI renter legend###################
@@ -2379,7 +2379,7 @@ server <- function(input, output, session) {
         group = "Non-white Population",
         layerId = nw_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add Non-white population legend ###############################
@@ -2433,7 +2433,7 @@ server <- function(input, output, session) {
         group = "College Educated Population",
         layerId = college_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add college population legend ################################
@@ -2487,7 +2487,7 @@ server <- function(input, output, session) {
         group = "Renter-Occupied Housing",
         layerId = renter_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add renter occupied legend ###############################
@@ -2541,7 +2541,7 @@ server <- function(input, output, session) {
         group = "Median Rent",
         layerId = med_rent_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add median rent legend ##################################
@@ -2595,7 +2595,7 @@ server <- function(input, output, session) {
         group = "Median Income",
         layerId = med_inc_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
       ) %>%
 
         ## Add median income legend ##################################
