@@ -3,11 +3,7 @@ This repo contains work done for the Urban Displacement Project (UDP) during the
 
 UDP is, in their own words, "a research and action initiative of UC Berkeley. UDP conducts community-centered, data-driven, applied research toward more equitable and inclusive futures for cities. Our research aims to understand and describe the nature of gentrification and displacement, and also to generate knowledge on how policy interventions and investment can respond and support more equitable development." You can find out more about them and their work [here](https://www.urbandisplacement.org/).
 
-My work for UDP contributed to their project with the [Strategic Growth Council](https://sgc.ca.gov/). The entire project summary can be found [here](https://www.urbandisplacement.org/current-projects), along with other ongoing UDP projects. The project summary is also quoted below.
-
-"Examining the unintended effects of climate change mitigation: a new tool to predict investment-related displacement
-
-This project is examining the unintended effects of climate change mitigation investment-related displacement, focusing on three regions: the Bay Area, Los Angeles, and Fresno county. This research will estimate the relationship between displacement pressures and California’s climate mitigation strategies, policies and the investments made possible by the Cap and Trade program in order to create tools that state agencies can to use to predict and mitigate the displacement impacts of future investments. The project is funded by Strategic Growth Council, and partners include Stanford University, Federal Reserve Bank of San Francisco, Public Advocates, Public Counsel, California Housing Partnership and Leadership Counsel."
+My work for UDP contributed to their project with the [Strategic Growth Council](https://sgc.ca.gov/). Focusing on Los Angeles, the San Francisco Bay Area, and Fresno, the project aims to understand the unintended impacts of climate change related investments on neighborhood displacement, and how to best mitigate adverse effects. The end result of this project will be a tool to predict investment-related displacement. The entire project summary can be found [here](https://www.urbandisplacement.org/current-projects#section-191), along with other ongoing UDP projects. 
 
 I was responsible for matching neighborhoods with investments to neighborhoods without investments, in order to appropriately study the impact of climate change mitigation investments. This process made use of the propensity score matching technique and studied outcomes with both full OLS regressions and fixed effects regressions. Finally, I also produced an interactive map demonstrating the selection process and visualizing the outcomes. Impacts were approximated using outmigration measures from InfoGroup (now [Data Axle](https://www.data-axle.com/)) and UDP's Naturally Occuring Affordable Housing (NOAH) dataset.
 
@@ -23,6 +19,9 @@ There are both OLS and fixed effects models in the writeup, and at various geogr
 
 # Map
 An interactive geospatial representation of the matching process and results is produced as a Shiny app using Leaflet. The code to produce the Shiny app is available in this repo, and the app itself can be accessed [here](https://matt-nissen.shinyapps.io/SGC_Matched_Neighborhoods_Map/?_ga=2.46349092.2031182488.1602192102-2050714689.1599855133).
+
+Screenshot of the interactive map showcasing some features:
+![Map Screenshot](https://github.com/mnissen1/udp_summer2020/blob/master/visualizations/map_screenshot.png)
 
 # Credits
 * R packages used in PSM: `tidyverse`, `MatchIt`, `gridExtra`, `tableone`, `broom`, `infer`, `glue`, `tidycensus`, `tigris`, `sf`, `knitr`, `leaps`, `kableExtra`, `gridExtra`, `magick`
