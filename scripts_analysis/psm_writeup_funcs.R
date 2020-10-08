@@ -241,7 +241,8 @@ noah_bar_plot <- function(area_stats, area_psm) {
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/bar_plots/noah_{area}.png",
+      homedir,
+      "visualizations/psm_writeup/bar_plots/noah_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = noah_bar)
@@ -342,7 +343,8 @@ outmigration_time <- function(area_stats, area_psm) {
   # Save to PNG 
   path <-
     str_glue(
-      "./SGC/visualizations/time_series/outmigration_time_{area}.png",
+      homedir,
+      "visualizations/psm_writeup/time_series/outmigration_time_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = time_plot)
@@ -403,7 +405,8 @@ outmigration_bar <- function(area_stats, area_psm) {
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/bar_plots/outmigration_bar_{area}.png",
+      homedir,
+      "visualizations/psm_writeup/bar_plots/outmigration_bar_{area}.png",
       area = str_extract(df_name, "^\\w+(?=_)")
     )
   ggsave(path, plot = bar_plot)
@@ -527,7 +530,8 @@ noah_type_bar_plot <- function(area_stats, area_psm) {
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/bar_plots/noah_{area}_{invest}.png",
+      homedir,
+      "visualizations/psm_writeup/bar_plots/noah_{area}_{invest}.png",
       area = str_extract(df_name, "^\\w+(?=_)"),
       invest = investment_type
     )
@@ -644,7 +648,8 @@ outmigration_type_time <- function(area_stats, area_psm) {
   # Save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/time_series/outmigration_{area}_{investment_type}.png",
+      homedir,
+      "visualizations/psm_writeup/time_series/outmigration_{area}_{investment_type}.png",
       area = str_extract(df_name, "^\\w+(?=_)"),
       investment_type = quo_name(investment_type)
     )
@@ -718,7 +723,8 @@ outmigration_type_bar <- function(area_stats, area_psm) {
   # save to PNG
   path <-
     str_glue(
-      "./SGC/visualizations/bar_plots/outmigration_{investment_type}_bar.png"
+      homedir,
+      "visualizations/psm_writeup/bar_plots/outmigration_{investment_type}_bar.png"
     )
   ggsave(path, plot = bar_plot)
   

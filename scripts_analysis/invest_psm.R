@@ -366,29 +366,29 @@ write_csv(
 ## Common support plots
 ggsave(
   plot = common_support_la, 
-  filename = paste0(homedir, "visualizations/psm/common_support_la.png")
+  filename = paste0(homedir, "visualizations/psm_tests/common_support_la.png")
 )
 ggsave(
   plot = common_support_sf, 
-  filename = paste0(homedir, "visualizations/psm/common_support_sf.png")
+  filename = paste0(homedir, "visualizations/psm_tests/common_support_sf.png")
 )
 ggsave(
   plot = common_support_fresno, 
-  filename = paste0(homedir, "visualizations/psm/common_support_fresno.png")
+  filename = paste0(homedir, "visualizations/psm_tests/common_support_fresno.png")
 )
 
 ## Covariate balance plots
 ggsave(
   plot = cov_balance_la, 
-  filename = paste0(homedir, "visualizations/psm/covariate_balance_la.png")
+  filename = paste0(homedir, "visualizations/psm_tests/covariate_balance_la.png")
 )
 ggsave(
   plot = cov_balance_sf, 
-  filename = paste0(homedir, "visualizations/psm/covariate_balance_sf.png")
+  filename = paste0(homedir, "visualizations/psm_tests/covariate_balance_sf.png")
 )
 ggsave(
   plot = cov_balance_fresno, 
-  filename = paste0(homedir, "visualizations/psm/covariate_balance_fresno.png")
+  filename = paste0(homedir, "visualizations/psm_tests/covariate_balance_fresno.png")
 )
 
 # Clean up environment
