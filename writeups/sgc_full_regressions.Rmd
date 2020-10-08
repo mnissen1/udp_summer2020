@@ -1,0 +1,5237 @@
+---
+title: "SGC Full Regressions"
+author: "Matt Alvarez-Nissen"
+date: "9/6/2020"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = "asis", message = FALSE, warning = FALSE)
+```
+
+```{r read-libraries-parameters, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(glue)
+
+# Files
+## PSM results
+total_stats_all_file <- "./SGC/total_stats_all.csv"
+
+## ACS
+all_years_tract_ca_file <- "./SGC/tract characteristics/all_years_tract_CA.csv"
+
+## NOAH 
+noah_00_file <- "./SGC/NOAH_SGC_2000.csv"
+crosswalk_00_10_file <- "./SGC/crosswalk_2000_2010.csv"
+```
+
+```{r read-noah-2000, echo= FALSE, warning=FALSE, message=FALSE}
+# Read in NOAH data (2000)
+noah_00 <- 
+  read_csv(noah_00_file) %>% 
+  # filter down to necessary columns
+  select(
+    GEOID = stctytrct,
+    noah_housing_tot = housing_tot,
+    noah_tot_clean,
+    noah_nolihtc_clean,
+    d_bay, 
+    d_la, 
+    d_fresno
+  )
+
+# Crosswalk 2000 NOAH to 2010 Census boundaries
+## Read in crosswalk file
+crosswalk_00_10 <- read_csv(crosswalk_00_10_file)
+```
+
+```{r filter-xwalk, warning=FALSE, message=FALSE}
+## Filter crosswalk to relevant tract IDs
+### Use crosswalk filter from Brown University Diversity and Disparities
+### https://s4.ad.brown.edu/projects/diversity/Researcher/LTBDDload/DataList.aspx
+
+# 2000 NOAH
+## Create list of FIPS from ACS data to filter on
+fips_00_filter <-
+  paste(noah_00$GEOID, collapse = "|")
+
+## Filter crosswalk data by relevant FIPS
+crosswalk_00_filter <-
+  crosswalk_00_10 %>% 
+  filter(str_detect(trtid00, fips_00_filter))
+```
+
+```{r do-crosswalk, echo=FALSE, warning=FALSE, message=FALSE}
+# 2000 NOAH
+## Interpolate 2000 boundary data to 2010 tracts
+noah_00_xwalk <-
+  noah_00 %>% 
+  # rename full FIPS code for a join
+  rename(trtid00 = GEOID) %>% 
+  # join to filtered crosswalk
+  full_join(crosswalk_00_filter, by = "trtid00") %>% 
+  # change weight from character to numeric type
+  mutate(weight = as.numeric(weight)) %>% 
+  # multiply all data by its weight
+  mutate(
+    across(
+      # select all NOAH data
+      noah_housing_tot:noah_nolihtc_clean,
+      # find value of data multiplied by weight
+      ~ . * weight, 
+      # attach name in the following pattern
+      .names = "{col}_00"
+    )
+  ) %>% 
+  # select for relevant variables (2010 tracts)
+  select(trtid10, ends_with("_00")) %>% 
+  # group by 2010 tracts
+  group_by(trtid10) %>% 
+  # sum up all variables
+  summarise_all(sum) %>% 
+  # rename trtid10 to GEOID
+  rename(GEOID = trtid10)
+```
+
+```{r write-noah-2000-xwalk}
+noah_00_xwalk %>% write_csv("./SGC/NOAH_SGC_2000_xwalk.csv")
+```
+
+```{r read-psm-results}
+total_stats_all <- read_csv(total_stats_all_file)
+```
+
+# FIXED EFFECTS NOTES
+* Used 2010 for all Granville Properties
+* Don't know year for MacArthur Transit Village
+* Used Construction Date for Concord
+* Don't know year for Crenshaw Boulevard Streetscape Plan (Los Angeles TOD Planning (Round 1))
+* Don't know year for Midtown Transportation & Streetscape Improvements
+* Don't know year for Rumrill Park
+* Don't know year for Salud Park
+* Used Construction Date for Ed Roberts Campus
+* Used 2015 (2016 flag) for all Taylor Yard Village properties
+* Used 2018 flag for Metro Willowbrook/Rosa Parks Station Improvements
+* Used 2018 flag for Albion Riverside Park
+
+```{r create-regression-df, warning=FALSE, message=FALSE}
+# Prepare data for full regressions
+# read in tract data
+all_years_tract_ca <- read_csv(all_years_tract_ca_file)
+
+# create regression df
+total_reg_df <-
+  total_stats_all %>% 
+  # create location flags
+  mutate(
+    la_flag = if_else(location == "LA", 1, 0),
+    sf_flag = if_else(location == "SF_Bay", 1, 0)
+  ) %>% 
+  # remove extra variables
+  select(-c(distance, location, n_invest)) %>% 
+  # reorder columns
+  select(GEOID, investment, la_flag, sf_flag, everything()) %>% 
+  # join with census tract data
+  left_join(all_years_tract_ca) %>% 
+  # join with 2000 NOAH data
+  left_join(noah_00_xwalk, by = "GEOID") %>% 
+  # rename total NOAH change variables
+  rename(
+    perc_noah_tot_change_09_16 = perc_noah_tot_change,
+    noah_tot_change_09_16 = noah_tot_change
+  ) %>% 
+  # create percent, percentage point, and unit NOAH change (2000-2009, 2009-2016)
+  mutate(
+    # unit change (2000-2009)
+    noah_tot_change_00_09 = noah_tot_clean_09 - noah_tot_clean_00,
+    # % change (2000-2009)
+    perc_noah_tot_change_00_09 = 
+      noah_tot_change_00_09 / noah_tot_clean_00,
+    # % point change (2000-2009)
+    perc_pnt_noah_change_00_09 =
+      (noah_tot_clean_09 / noah_housing_tot_09) - 
+      (noah_tot_clean_00 / noah_housing_tot_00),
+    # % point change (2009-2016)
+    perc_pnt_noah_change_09_16 =
+      (noah_tot_clean_16 / noah_housing_tot_16) - 
+      (noah_tot_clean_09 / noah_housing_tot_09)
+  ) %>% 
+  # Replace all "Inf" values with NA
+  mutate(across(.cols = everything(), na_if, Inf)) %>% 
+  # match investments to create fixed effects time flags
+  pivot_longer(
+    cols = c(investment_1:investment_7), 
+    values_to = "investment_name"
+  ) %>% 
+  # clean up investment names
+  select(-name) %>% 
+  # Group by GEOID
+  group_by(GEOID) %>% 
+  # create fixed effects dummies - based on Operation Start Date
+  # (Construction if not available)
+  mutate(
+    invest_begin_07 = 
+      case_when(
+        # SFMTA Third Street Light Rail
+        str_detect(investment_name, "Third St") ~ 1,
+        TRUE                                    ~ 0
+      ),
+    invest_begin_10 = 
+      case_when(
+        ## Concord- Monument Blvd/Meadow Ln Pedestrian Imprvs
+        str_detect(investment_name, "Concord")           ~ 1,
+        ## Ed Roberts Campus
+        str_detect(investment_name, "Ed Roberts")        ~ 1,
+        ## Granville Properties, first was completed 2010 - others at later date
+        ## lumping all together for now
+        str_detect(investment_name, "1612 Fulton St")    ~ 1,
+        str_detect(investment_name, "Brio on Broadway")  ~ 1,
+        str_detect(investment_name, "Bungalow Court")    ~ 1,
+        str_detect(investment_name, "Crichton Place")    ~ 1,
+        str_detect(investment_name, "Fulton Village")    ~ 1,
+        str_detect(investment_name, "The Lede")          ~ 1,
+        str_detect(investment_name, "Van Ness Cottages") ~ 1,
+        invest_begin_07 == 1                             ~ 1,
+        TRUE                                             ~ 0
+      ),
+    invest_begin_13 = 
+      case_when(
+        ## Mid City/Expo LRT
+        str_detect(investment_name, "Exposition Line") ~ 1,
+        invest_begin_10 == 1                           ~ 1,
+        TRUE                                           ~ 0
+      ),
+    invest_begin_16 = 
+       case_when(
+        ## San Leandro Downtown-BART Pedestrian Interface 
+        str_detect(investment_name, "San_Leandro")       ~ 1,
+        ## Cultural Arts District Park
+        str_detect(investment_name, "Cultural Arts")     ~ 1,
+        ## South Sacramento Corridor Light Rail Extension Phase 2
+        str_detect(investment_name, "Phase 2")           ~ 1,    
+        ## Metro Gold Line Foothill Extension (Phase 2A)
+        str_detect(investment_name, "Gold_Line")         ~ 1,
+        ## Taylor Yard Village
+        str_detect(investment_name, "Taylor Yard")       ~ 1,
+        str_detect(investment_name, "TYTV")              ~ 1,
+        ## El Monte Transit Village
+        str_detect(investment_name, "El Monte Transit" ) ~ 1,
+        invest_begin_13 == 1                             ~ 1,
+        TRUE                                             ~ 0
+      ),
+    invest_begin_18 =
+      case_when(
+        ## Fulton Mall Reconstruction Project
+        str_detect(investment_name, "fulton mall")       ~ 1,
+        ## Metro Willowbrook/Rosa Parks Station Improvements
+        str_detect(investment_name, "Willowbrook_Rosa" ) ~ 1,
+        ## Albion Riverside Park
+        str_detect(investment_name, "albion riverside" ) ~ 1,
+        ## Fresno BRT Improvements
+        str_detect(investment_name, "Fresno BRT")        ~ 1,
+        invest_begin_16 == 1                             ~ 1,
+        TRUE                                             ~ 0
+    )
+  ) %>%
+  # create # of investments in tract
+  mutate(investment_no = glue("investment_{1:7}")) %>%
+  # pivot to create unique rows (by tract)
+  pivot_wider(
+    names_from = investment_no,
+    values_from = investment_name
+  ) %>%
+  # filter out repeated tracts
+  # (equivalent to NA value of investment 1)
+  filter(!(is.na(investment_1) & investment == 1)) %>%
+  # need to ungroup GEOID
+  ungroup()
+```
+
+# Housing Affordability (NOAH)
+## Full models (NOAH)
+```{r create-noah-var-names, results="asis", warning=FALSE, message=FALSE}
+# Create shortcuts for reg models based on year
+vars_00 <-
+  total_reg_df %>% 
+  select(matches("_00")) %>% 
+  select(!matches("noah")) %>%
+  names() %>% 
+  paste(collapse = " + ")
+
+vars_09 <-
+  total_reg_df %>% 
+  select(matches("_09")) %>% 
+  select(-matches("noah")) %>%
+  # remove variables used in PSM
+  select(-c(pct_whi_09, pct_h_rent_09, med_rent_09, pct_college_09)) %>% 
+  names() %>% 
+  paste(collapse = " + ")
+```
+
+### NOAH 2000 - 2009
+```{r create-full-reg-models-00-09, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2000-2009
+## create string of dependent variables
+ivs_00 <- paste("investment + la_flag + sf_flag +",  vars_00)
+
+## linear regression on NOAH percent change
+perc_noah_00_reg <- 
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg <- 
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg <- 
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+```
+
+```{r print-full-reg-models-00-09, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg,
+  perc_pnt_noah_00_reg, 
+  unit_noah_00_reg,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in Total Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016
+```{r create-full-reg-models-09-16, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2009-2016
+## create string of dependent variables
+ivs_09 <- paste("investment + la_flag + sf_flag +",  vars_09)
+
+## linear regression on NOAH percent change
+perc_noah_09_reg <-
+  lm(
+    formula(paste("perc_noah_tot_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg <-
+  lm(
+    formula(paste("perc_pnt_noah_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg <-
+  lm(
+    formula(paste("noah_tot_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+```
+
+```{r print-full-reg-models-09-16, results="asis", warning=FALSE, message=FALSE}
+# Reg table
+stargazer::stargazer(
+  perc_noah_09_reg,
+  perc_pnt_noah_09_reg,
+  unit_noah_09_reg,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in Total Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+## Models by investment (NOAH)
+### NOAH 2000 - 2009
+```{r create-invest-model-00-09, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2000-2009 by investment
+## create string of dependent variables
+ivs_00 <-
+  paste(
+    "la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
+    vars_00
+  )
+
+## linear regression on NOAH percent change
+perc_noah_00_reg <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df
+  )
+```
+
+```{r print-invest-model-00-09, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg,
+  perc_pnt_noah_00_reg,
+  unit_noah_00_reg,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in Total Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016
+```{r create-invest-model-09-16, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2009-2016
+## create string of dependent variables
+ivs_09 <-
+  paste(
+    "la_flag + sf_flag + greening + transit + urban_infill + active_transportation +",
+    vars_09
+  )
+
+## linear regression on NOAH percent change
+perc_noah_09_reg <-
+  lm(
+    formula(paste("perc_noah_tot_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg <-
+  lm(
+    formula(paste("perc_pnt_noah_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg <-
+  lm(
+    formula(paste("noah_tot_change_09_16 ~", ivs_09)),
+    total_reg_df
+  )
+```
+
+```{r print-invest-model-09-16, results="asis", warning=FALSE, message=FALSE}
+# Reg table
+stargazer::stargazer(
+  perc_noah_09_reg,
+  perc_pnt_noah_09_reg,
+  unit_noah_09_reg,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in Total Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+## Models by metropolitan area (NOAH)
+```{r create-metro-model-00-09, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2000-2009 by metro area
+## create string of dependent variables
+ivs_00 <- paste("investment +", vars_00)
+
+# LA Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_la <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_la <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_la <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+# Fresno Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_fresno <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_fresno <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_fresno <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+# SF Bay Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_sf <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_sf <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_sf <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+```
+
+### NOAH 2000 - 2009 (LA)
+```{r print-metro-model-00-09-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_la,
+  perc_pnt_noah_00_reg_la,
+  unit_noah_00_reg_la,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the LA Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2000 - 2009 (Fresno)
+```{r print-metro-model-00-09-fresno}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_fresno,
+  perc_pnt_noah_00_reg_fresno,
+  unit_noah_00_reg_fresno,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the Fresno Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2000 - 2009 (SF Bay Area)
+```{r print-metro-model-00-09-sf}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_sf,
+  perc_pnt_noah_00_reg_sf,
+  unit_noah_00_reg_sf,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the SF Bay Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+```{r create-metro-model-09-16, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2009-2016
+## create string of dependent variables
+ivs_09 <-
+  paste("investment +", vars_09)
+
+# LA Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_la <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_la <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_la <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+# Fresno Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_fresno <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_fresno <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_fresno <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+# SF Bay Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_sf <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_sf <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_sf <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+```
+
+### NOAH 2009 - 2016 (LA)
+```{r print-metro-model-09-16-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_la,
+  perc_pnt_noah_09_reg_la,
+  unit_noah_09_reg_la,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in the LA Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016 (Fresno)
+```{r print-metro-model-09-16-fresno}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_fresno,
+  perc_pnt_noah_09_reg_fresno,
+  unit_noah_09_reg_fresno,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in the Fresno Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016 (SF Bay Area)
+```{r print-metro-model-09-16-sf}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_sf,
+  perc_pnt_noah_09_reg_sf,
+  unit_noah_09_reg_sf,
+  type = "html",
+  title = "NOAH Change 2000 - 2016 in the SF Bay Area",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+## Models by investment and metropolitan area (NOAH)
+```{r create-invest-metro-model-00-09, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2000-2009 by metro area
+## create string of dependent variables
+ivs_00 <-
+  paste(
+    "greening + transit + urban_infill + active_transportation +",
+    vars_00
+  )
+
+# LA Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_la <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_la <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_la <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+# Fresno Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_fresno <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_fresno <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_fresno <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+# SF Bay Models
+## linear regression on NOAH percent change
+perc_noah_00_reg_sf <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_00_reg_sf <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_00_reg_sf <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_00)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+```
+
+### NOAH 2000 - 2009 (LA)
+```{r print-invest-metro-model-00-09-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_la,
+  perc_pnt_noah_00_reg_la,
+  unit_noah_00_reg_la,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the LA Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2000 - 2009 (Fresno)
+```{r print-invest-metro-model-00-09-fresno}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_fresno,
+  perc_pnt_noah_00_reg_fresno,
+  unit_noah_00_reg_fresno,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the Fresno Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2000 - 2009 (SF Bay Area)
+```{r print-invest-metro-model-00-09-sf}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_00_reg_sf,
+  perc_pnt_noah_00_reg_sf,
+  unit_noah_00_reg_sf,
+  type = "html",
+  title = "NOAH Change 2000 - 2009 in the SF Bay Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+```{r create-invest-metro-model-09-16, results="asis", warning=FALSE, message=FALSE}
+# NOAH 2009-2016
+## create string of dependent variables
+ivs_09 <-
+  paste(
+    "greening + transit + urban_infill + active_transportation +",
+    vars_09
+  )
+
+# LA Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_la <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_la <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_la <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 1)
+  )
+
+# Fresno Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_fresno <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_fresno <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_fresno <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(la_flag == 0 & sf_flag == 0)
+  )
+
+# SF Bay Models
+## linear regression on NOAH percent change
+perc_noah_09_reg_sf <-
+  lm(
+    formula(paste("perc_noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH percentage point change
+perc_pnt_noah_09_reg_sf <-
+  lm(
+    formula(paste("perc_pnt_noah_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+
+## linear regression on NOAH unit change
+unit_noah_09_reg_sf <-
+  lm(
+    formula(paste("noah_tot_change_00_09 ~", ivs_09)),
+    total_reg_df %>% filter(sf_flag == 1)
+  )
+```
+
+### NOAH 2009 - 2016 (LA)
+```{r print-invest-metro-model-09-16-la}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_la,
+  perc_pnt_noah_09_reg_la,
+  unit_noah_09_reg_la,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in the LA Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016 (Fresno)
+```{r print-invest-metro-model-09-16-fresno}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_fresno,
+  perc_pnt_noah_09_reg_fresno,
+  unit_noah_09_reg_fresno,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in the Fresno Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+### NOAH 2009 - 2016 (SF Bay Area)
+```{r print-invest-metro-model-09-16-sf}
+# Print reg table
+stargazer::stargazer(
+  perc_noah_09_reg_sf,
+  perc_pnt_noah_09_reg_sf,
+  unit_noah_09_reg_sf,
+  type = "html",
+  title = "NOAH Change 2009 - 2016 in the SF Bay Area by Investment Type",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("PERCENT", "PERCENTAGE POINT", "UNIT")
+)
+```
+
+# Displacement OLS (Outmigration)
+## Full models (OLS - Outmigration)
+```{r create-outmig-var-names, results="asis", warning=FALSE, message=FALSE}
+# Create shortcuts for reg models based on year
+vars_07 <-
+  total_reg_df %>%
+  select(matches("_09")) %>%
+  select(-matches("noah")) %>%
+  names() %>%
+  paste(collapse = " + ")
+
+vars_10 <-
+  total_reg_df %>%
+  select(matches("_10")) %>%
+  select(-matches("noah")) %>%
+  names() %>%
+  paste(collapse = " + ")
+
+vars_13 <-
+  total_reg_df %>%
+  select(matches("_13")) %>%
+  select(-matches("noah")) %>%
+  names() %>%
+  paste(collapse = " + ")
+
+vars_16 <-
+  total_reg_df %>%
+  select(matches("_16")) %>%
+  select(-matches("noah")) %>%
+  names() %>%
+  paste(collapse = " + ")
+
+vars_18 <-
+  total_reg_df %>%
+  select(matches("_18")) %>%
+  select(-matches("noah")) %>%
+  names() %>%
+  paste(collapse = " + ")
+```
+
+```{r create-outmig-model-helper-func}
+# helper function for outmigration regs
+outmigration_reg_full_ols <- function(df, vars_year, year, outmig_type, area_ivs = c(), type_ivs = c()) {
+  year <- enquo(year)
+  outmig_type <- enquo(outmig_type)
+
+  ## create string of independent variables
+  ivs <- paste("investment +", vars_year)
+
+  ## Attach study area IVs if needed
+  if (length(area_ivs) != 0){
+    ivs <- paste(area_ivs, ivs, sep = " + ")
+  }
+
+  ## Attach investment type IVs if needed
+  if (length(type_ivs) != 0){
+    ivs <- paste(type_ivs, ivs, sep = " + ")
+  }
+
+  ## linear regression on outmigration type
+  outmig_reg <-
+    lm(
+      formula(
+        paste0(
+          "outmigration_",
+          as_label(outmig_type),
+          "_",
+          as_label(year),
+          " ~ ",
+          ivs
+        )
+      ),
+      df
+    )
+  return(outmig_reg)
+}
+```
+
+### Outmigration 2007
+```{r create-full-model-07, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_07, 2007, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_07, 2007, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_07, 2007, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_07, 2007, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-model-07, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_07_reg,
+  outmig_li_07_reg,
+  outmig_r_07_reg,
+  outmig_li_r_07_reg,
+  type = "html",
+  title = "2007 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010
+```{r create-full-model-10, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_10, 2010, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_10, 2010, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_10, 2010, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_10, 2010, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-model-10, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_10_reg,
+  outmig_li_10_reg,
+  outmig_r_10_reg,
+  outmig_li_r_10_reg,
+  type = "html",
+  title = "2010 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013
+```{r create-full-model-13, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_13, 2013, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_13, 2013, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_13, 2013, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_13, 2013, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-model-13, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_13_reg,
+  outmig_li_13_reg,
+  outmig_r_13_reg,
+  outmig_li_r_13_reg,
+  type = "html",
+  title = "2013 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016
+```{r create-full-model-16, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_16, 2016, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_16, 2016, LI, area_ivs = "la_flag + sf_flag",
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_16, 2016, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_16, 2016, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-model-16, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_16_reg,
+  outmig_li_16_reg,
+  outmig_r_16_reg,
+  outmig_li_r_16_reg,
+  type = "html",
+  title = "2016 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018
+```{r create-full-model-18, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_18, 2018, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_18, 2018, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_18, 2018, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df, vars_18, 2018, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-model-18, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_18_reg,
+  outmig_li_18_reg,
+  outmig_r_18_reg,
+  outmig_li_r_18_reg,
+  type = "html",
+  title = "2018 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by investment (OLS - Outmigration)
+### Outmigration 2007
+```{r create-invest-model-07, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_07,
+    2007,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_07,
+    2007,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_07,
+    2007,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_07,
+    2007,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-model-07, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_07_reg,
+  outmig_li_07_reg,
+  outmig_r_07_reg,
+  outmig_li_r_07_reg,
+  type = "html",
+  title = "2007 Outmigration Rate in Total Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010
+```{r create-invest-model-10, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_10,
+    2010,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_10,
+    2010,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_10,
+    2010,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_10,
+    2010,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-model-10, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_10_reg,
+  outmig_li_10_reg,
+  outmig_r_10_reg,
+  outmig_li_r_10_reg,
+  type = "html",
+  title = "2010 Outmigration Rate in Total Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013
+```{r create-invest-model-13, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_13,
+    2013,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_13,
+    2013,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_13,
+    2013,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_13,
+    2013,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-model-13, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_13_reg,
+  outmig_li_13_reg,
+  outmig_r_13_reg,
+  outmig_li_r_13_reg,
+  type = "html",
+  title = "2013 Outmigration Rate in Total Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016
+```{r create-invest-model-16, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_16,
+    2016,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_16,
+    2016,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_16,
+    2016,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_16,
+    2016,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-model-16, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_16_reg,
+  outmig_li_16_reg,
+  outmig_r_16_reg,
+  outmig_li_r_16_reg,
+  type = "html",
+  title = "2016 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018
+```{r create-invest-model-18, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_18,
+    2018,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_18,
+    2018,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_18,
+    2018,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg <-
+  outmigration_reg_full_ols(
+    total_reg_df,
+    vars_18,
+    2018,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-model-18, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_18_reg,
+  outmig_li_18_reg,
+  outmig_r_18_reg,
+  outmig_li_r_18_reg,
+  type = "html",
+  title = "2018 Outmigration Rate in Total Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by metropolitan area (OLS - Outmigration)
+```{r create-metro-model-07, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, LI_renters
+  )
+
+# SF Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, LI_renters
+  )
+
+
+# Fresno Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_07,
+   2007,
+   LI_renters
+  )
+```
+
+### Outmigration 2007 (LA)
+```{r print-metro-model-07-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_07_reg_la,
+  outmig_li_07_reg_la,
+  outmig_r_07_reg_la,
+  outmig_li_r_07_reg_la,
+  type = "html",
+  title = "2007 Outmigration Rate in the LA Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (SF)
+```{r print-metro-model-07-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_07_reg_sf,
+  outmig_li_07_reg_sf,
+  outmig_r_07_reg_sf,
+  outmig_li_r_07_reg_sf,
+  type = "html",
+  title = "2007 Outmigration Rate in the SF Bay Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (Fresno)
+```{r print-metro-model-07-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_07_reg_fresno,
+  outmig_li_07_reg_fresno,
+  outmig_r_07_reg_fresno,
+  outmig_li_r_07_reg_fresno,
+  type = "html",
+  title = "2007 Outmigration Rate in the Fresno Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-model-10, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, LI_renters
+  )
+
+# SF Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, LI_renters
+  )
+
+# Fresno Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_10,
+   2010,
+   LI_renters
+  )
+```
+
+### Outmigration 2010 (LA)
+```{r print-metro-model-10-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_10_reg_la,
+  outmig_li_10_reg_la,
+  outmig_r_10_reg_la,
+  outmig_li_r_10_reg_la,
+  type = "html",
+  title = "2010 Outmigration Rate in the LA Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (SF Bay Area)
+```{r print-metro-model-10-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_10_reg_sf,
+  outmig_li_10_reg_sf,
+  outmig_r_10_reg_sf,
+  outmig_li_r_10_reg_sf,
+  type = "html",
+  title = "2010 Outmigration Rate in the SF Bay Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (Fresno)
+```{r print-metro-model-10-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_10_reg_fresno,
+  outmig_li_10_reg_fresno,
+  outmig_r_10_reg_fresno,
+  outmig_li_r_10_reg_fresno,
+  type = "html",
+  title = "2010 Outmigration Rate in the Fresno Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-model-13, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, LI_renters
+  )
+
+# SF Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, LI_renters
+  )
+
+# Fresno Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_13,
+   2013,
+   LI_renters
+  )
+```
+
+### Outmigration 2013 (LA)
+```{r print-metro-model-13-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_13_reg_la,
+  outmig_li_13_reg_la,
+  outmig_r_13_reg_la,
+  outmig_li_r_13_reg_la,
+  type = "html",
+  title = "2013 Outmigration Rate in the LA Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (SF Bay Area)
+```{r print-metro-model-13-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_13_reg_sf,
+  outmig_li_13_reg_sf,
+  outmig_r_13_reg_sf,
+  outmig_li_r_13_reg_sf,
+  type = "html",
+  title = "2013 Outmigration Rate in the SF Bay Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (Fresno)
+```{r print-metro-model-13-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_13_reg_fresno,
+  outmig_li_13_reg_fresno,
+  outmig_r_13_reg_fresno,
+  outmig_li_r_13_reg_fresno,
+  type = "html",
+  title = "2013 Outmigration Rate in the Fresno Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-model-16, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, LI_renters
+  )
+
+# SF Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, LI_renters
+  )
+
+# Fresno Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_16,
+   2016,
+   LI_renters
+  )
+```
+
+### Outmigration 2016 (LA)
+```{r print-metro-model-16-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_16_reg_la,
+  outmig_li_16_reg_la,
+  outmig_r_16_reg_la,
+  outmig_li_r_16_reg_la,
+  type = "html",
+  title = "2016 Outmigration Rate in the LA Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (SF Bay Area)
+```{r print-metro-model-16-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_16_reg_sf,
+  outmig_li_16_reg_sf,
+  outmig_r_16_reg_sf,
+  outmig_li_r_16_reg_sf,
+  type = "html",
+  title = "2016 Outmigration Rate in the SF Bay Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (Fresno)
+```{r print-metro-model-16-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_16_reg_fresno,
+  outmig_li_16_reg_fresno,
+  outmig_r_16_reg_fresno,
+  outmig_li_r_16_reg_fresno,
+  type = "html",
+  title = "2016 Outmigration Rate in the Fresno Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-model-18, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, LI_renters
+  )
+
+# SF Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, LI_renters
+  )
+
+# Fresno Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_18,
+   2018,
+   LI_renters
+  )
+```
+
+### Outmigration 2018 (LA)
+```{r print-metro-model-18-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_18_reg_la,
+  outmig_li_18_reg_la,
+  outmig_r_18_reg_la,
+  outmig_li_r_18_reg_la,
+  type = "html",
+  title = "2018 Outmigration Rate in the LA Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (SF Bay Area)
+```{r print-metro-model-18-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_18_reg_sf,
+  outmig_li_18_reg_sf,
+  outmig_r_18_reg_sf,
+  outmig_li_r_18_reg_sf,
+  type = "html",
+  title = "2018 Outmigration Rate in the SF Bay Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (Fresno)
+```{r print-metro-model-18-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_18_reg_fresno,
+  outmig_li_18_reg_fresno,
+  outmig_r_18_reg_fresno,
+  outmig_li_r_18_reg_fresno,
+  type = "html",
+  title = "2018 Outmigration Rate in the Fresno Area (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by investment and metropolitan area (OLS - Outmigration)
+```{r create-invest-metro-model-07, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_07,
+   2007,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2007 (LA)
+```{r print-invest-metro-model-07-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_07_reg_la,
+  outmig_li_07_reg_la,
+  outmig_r_07_reg_la,
+  outmig_li_r_07_reg_la,
+  type = "html",
+  title = "2007 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (SF Bay Area)
+```{r print-invest-metro-model-07-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_07_reg_sf,
+  outmig_li_07_reg_sf,
+  outmig_r_07_reg_sf,
+  outmig_li_r_07_reg_sf,
+  type = "html",
+  title = "2007 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (Fresno)
+```{r print-invest-metro-model-07-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_07_reg_fresno,
+  outmig_li_07_reg_fresno,
+  outmig_r_07_reg_fresno,
+  outmig_li_r_07_reg_fresno,
+  type = "html",
+  title = "2007 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-model-10, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_10,
+   2010,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2010 (LA)
+```{r print-invest-metro-model-10-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_10_reg_la,
+  outmig_li_10_reg_la,
+  outmig_r_10_reg_la,
+  outmig_li_r_10_reg_la,
+  type = "html",
+  title = "2010 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (SF)
+```{r print-invest-metro-model-10-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_10_reg_sf,
+  outmig_li_10_reg_sf,
+  outmig_r_10_reg_sf,
+  outmig_li_r_10_reg_sf,
+  type = "html",
+  title = "2010 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (Fresno)
+```{r print-invest-metro-model-10-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_10_reg_fresno,
+  outmig_li_10_reg_fresno,
+  outmig_r_10_reg_fresno,
+  outmig_li_r_10_reg_fresno,
+  type = "html",
+  title = "2010 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-model-13, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2013 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2013 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_13,
+   2013,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2013 (LA)
+```{r print-invest-metro-model-13-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_13_reg_la,
+  outmig_li_13_reg_la,
+  outmig_r_13_reg_la,
+  outmig_li_r_13_reg_la,
+  type = "html",
+  title = "2013 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (SF Bay Area)
+```{r print-invest-metro-model-13-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_13_reg_sf,
+  outmig_li_13_reg_sf,
+  outmig_r_13_reg_sf,
+  outmig_li_r_13_reg_sf,
+  type = "html",
+  title = "2013 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (Fresno)
+```{r print-invest-metro-model-13-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_13_reg_fresno,
+  outmig_li_13_reg_fresno,
+  outmig_r_13_reg_fresno,
+  outmig_li_r_13_reg_fresno,
+  type = "html",
+  title = "2013 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-model-16, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_16,
+   2016,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2016 (LA)
+```{r print-invest-metro-model-16-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_16_reg_la,
+  outmig_li_16_reg_la,
+  outmig_r_16_reg_la,
+  outmig_li_r_16_reg_la,
+  type = "html",
+  title = "2016 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (SF Bay Area)
+```{r print-invest-metro-model-16-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_16_reg_sf,
+  outmig_li_16_reg_sf,
+  outmig_r_16_reg_sf,
+  outmig_li_r_16_reg_sf,
+  type = "html",
+  title = "2016 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (Fresno)
+```{r print-invest-metro-model-16-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_16_reg_fresno,
+  outmig_li_16_reg_fresno,
+  outmig_r_16_reg_fresno,
+  outmig_li_r_16_reg_fresno,
+  type = "html",
+  title = "2016 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-model-18, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_la <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_sf <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2018 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_fresno <-
+  outmigration_reg_full_ols(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_fresno <-
+  outmigration_reg_full_ols(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_18,
+   2018,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2018 (LA)
+```{r print-invest-metro-model-18-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_18_reg_la,
+  outmig_li_18_reg_la,
+  outmig_r_18_reg_la,
+  outmig_li_r_18_reg_la,
+  type = "html",
+  title = "2018 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (SF Bay Area)
+```{r print-invest-metro-model-18-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_18_reg_sf,
+  outmig_li_18_reg_sf,
+  outmig_r_18_reg_sf,
+  outmig_li_r_18_reg_sf,
+  type = "html",
+  title = "2018 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (Fresno)
+```{r print-invest-metro-model-18-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_18_reg_fresno,
+  outmig_li_18_reg_fresno,
+  outmig_r_18_reg_fresno,
+  outmig_li_r_18_reg_fresno,
+  type = "html",
+  title = "2018 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+# Displacement Fixed Effects (Outmigration)
+## Full models (fixed effects - Outmigration)
+```{r create-outmig-fixed-helper-func}
+# helper function for outmigration regs
+outmigration_reg_full_fixed <- function(df, vars_year, year, outmig_type, area_ivs = c(), type_ivs = c()) {
+  year <- enquo(year)
+  outmig_type <- enquo(outmig_type)
+
+  ## create string of independent variables
+  ivs <- 
+    paste(
+      "invest_begin_07 + invest_begin_10 + invest_begin_13 + invest_begin_16 + invest_begin_18 +",
+      vars_year
+    )
+
+  ## Attach study area IVs if needed
+  if (length(area_ivs) != 0){
+    ivs <- paste(area_ivs, ivs, sep = " + ")
+  }
+
+  ## Attach investment type IVs if needed
+  if (length(type_ivs) != 0){
+    ivs <- paste(type_ivs, ivs, sep = " + ")
+  }
+
+  ## linear regression on outmigration type
+  outmig_reg <-
+    lm(
+      formula(
+        paste0(
+          "outmigration_",
+          as_label(outmig_type),
+          "_",
+          as_label(year),
+          " ~ ",
+          ivs
+        )
+      ),
+      df
+    )
+  return(outmig_reg)
+}
+```
+
+### Outmigration 2007
+```{r create-full-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_07, 2007, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_07, 2007, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_07, 2007, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_07, 2007, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_07_reg,
+  outmig_li_07_reg,
+  outmig_r_07_reg,
+  outmig_li_r_07_reg,
+  type = "html",
+  title = "2007 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010
+```{r create-full-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_10, 2010, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_10, 2010, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_10, 2010, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_10, 2010, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_10_reg,
+  outmig_li_10_reg,
+  outmig_r_10_reg,
+  outmig_li_r_10_reg,
+  type = "html",
+  title = "2010 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013
+```{r create-full-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_13, 2013, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_13, 2013, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_13, 2013, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_13, 2013, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_13_reg,
+  outmig_li_13_reg,
+  outmig_r_13_reg,
+  outmig_li_r_13_reg,
+  type = "html",
+  title = "2013 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016
+```{r create-full-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_16, 2016, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_16, 2016, LI, area_ivs = "la_flag + sf_flag",
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_16, 2016, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_16, 2016, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_16_reg,
+  outmig_li_16_reg,
+  outmig_r_16_reg,
+  outmig_li_r_16_reg,
+  type = "html",
+  title = "2016 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018
+```{r create-full-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_18, 2018, all, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_18, 2018, LI, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_18, 2018, renters, area_ivs = "la_flag + sf_flag"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df, vars_18, 2018, LI_renters, area_ivs = "la_flag + sf_flag"
+  )
+```
+
+```{r print-full-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_18_reg,
+  outmig_li_18_reg,
+  outmig_r_18_reg,
+  outmig_li_r_18_reg,
+  type = "html",
+  title = "2018 Outmigration Rate in Total Area (Full Fixed)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by investment (fixed effects - Outmigration)
+### Outmigration 2007
+```{r create-invest-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_07,
+    2007,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_07,
+    2007,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_07,
+    2007,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_07,
+    2007,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_07_reg,
+  outmig_li_07_reg,
+  outmig_r_07_reg,
+  outmig_li_r_07_reg,
+  type = "html",
+  title = 
+    "2007 Outmigration Rate in Total Area by Investment Type (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010
+```{r create-invest-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_10,
+    2010,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_10,
+    2010,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_10,
+    2010,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_10,
+    2010,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_10_reg,
+  outmig_li_10_reg,
+  outmig_r_10_reg,
+  outmig_li_r_10_reg,
+  type = "html",
+  title = 
+    "2010 Outmigration Rate in Total Area by Investment Type (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013
+```{r create-invest-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_13,
+    2013,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_13,
+    2013,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_13,
+    2013,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_13,
+    2013,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_13_reg,
+  outmig_li_13_reg,
+  outmig_r_13_reg,
+  outmig_li_r_13_reg,
+  type = "html",
+  title = 
+    "2013 Outmigration Rate in Total Area by Investment Type (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016
+```{r create-invest-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_16,
+    2016,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_16,
+    2016,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_16,
+    2016,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_16,
+    2016,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_16_reg,
+  outmig_li_16_reg,
+  outmig_r_16_reg,
+  outmig_li_r_16_reg,
+  type = "html",
+  title = "2016 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018
+```{r create-invest-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_18,
+    2018,
+    all,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_18,
+    2018,
+    LI,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_18,
+    2018,
+    renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg <-
+  outmigration_reg_full_fixed(
+    total_reg_df,
+    vars_18,
+    2018,
+    LI_renters,
+    area_ivs = "la_flag + sf_flag",
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+```{r print-invest-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# Print reg table
+stargazer::stargazer(
+  outmig_all_18_reg,
+  outmig_li_18_reg,
+  outmig_r_18_reg,
+  outmig_li_r_18_reg,
+  type = "html",
+  title = "2018 Outmigration Rate in Total Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by metropolitan area (fixed effects - Outmigration)
+```{r create-metro-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_07, 2007, LI_renters
+  )
+
+# SF Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_07, 2007, LI_renters
+  )
+
+
+# Fresno Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_07, 2007, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_07,
+   2007,
+   LI_renters
+  )
+```
+
+### Outmigration 2007 (LA)
+```{r print-metro-fixed-07-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_07_reg_la,
+  outmig_li_07_reg_la,
+  outmig_r_07_reg_la,
+  outmig_li_r_07_reg_la,
+  type = "html",
+  title = "2007 Outmigration Rate in the LA Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (SF)
+```{r print-metro-fixed-07-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_07_reg_sf,
+  outmig_li_07_reg_sf,
+  outmig_r_07_reg_sf,
+  outmig_li_r_07_reg_sf,
+  type = "html",
+  title = "2007 Outmigration Rate in the SF Bay Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (Fresno)
+```{r print-metro-fixed-07-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_07_reg_fresno,
+  outmig_li_07_reg_fresno,
+  outmig_r_07_reg_fresno,
+  outmig_li_r_07_reg_fresno,
+  type = "html",
+  title = "2007 Outmigration Rate in the Fresno Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_10, 2010, LI_renters
+  )
+
+# SF Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_10, 2010, LI_renters
+  )
+
+# Fresno Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_10, 2010, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_10,
+   2010,
+   LI_renters
+  )
+```
+
+### Outmigration 2010 (LA)
+```{r print-metro-fixed-10-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_10_reg_la,
+  outmig_li_10_reg_la,
+  outmig_r_10_reg_la,
+  outmig_li_r_10_reg_la,
+  type = "html",
+  title = "2010 Outmigration Rate in the LA Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (SF Bay Area)
+```{r print-metro-fixed-10-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_10_reg_sf,
+  outmig_li_10_reg_sf,
+  outmig_r_10_reg_sf,
+  outmig_li_r_10_reg_sf,
+  type = "html",
+  title = "2010 Outmigration Rate in the SF Bay Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (Fresno)
+```{r print-metro-fixed-10-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_10_reg_fresno,
+  outmig_li_10_reg_fresno,
+  outmig_r_10_reg_fresno,
+  outmig_li_r_10_reg_fresno,
+  type = "html",
+  title = "2010 Outmigration Rate in the Fresno Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_13, 2013, LI_renters
+  )
+
+# SF Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_13, 2013, LI_renters
+  )
+
+# Fresno Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_13, 2013, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_13,
+   2013,
+   LI_renters
+  )
+```
+
+### Outmigration 2013 (LA)
+```{r print-metro-fixed-13-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_13_reg_la,
+  outmig_li_13_reg_la,
+  outmig_r_13_reg_la,
+  outmig_li_r_13_reg_la,
+  type = "html",
+  title = "2013 Outmigration Rate in the LA Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (SF Bay Area)
+```{r print-metro-fixed-13-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_13_reg_sf,
+  outmig_li_13_reg_sf,
+  outmig_r_13_reg_sf,
+  outmig_li_r_13_reg_sf,
+  type = "html",
+  title = "2013 Outmigration Rate in the SF Bay Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (Fresno)
+```{r print-metro-fixed-13-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_13_reg_fresno,
+  outmig_li_13_reg_fresno,
+  outmig_r_13_reg_fresno,
+  outmig_li_r_13_reg_fresno,
+  type = "html",
+  title = "2013 Outmigration Rate in the Fresno Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_16, 2016, LI_renters
+  )
+
+# SF Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_16, 2016, LI_renters
+  )
+
+# Fresno Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_16, 2016, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_16,
+   2016,
+   LI_renters
+  )
+```
+
+### Outmigration 2016 (LA)
+```{r print-metro-fixed-16-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_16_reg_la,
+  outmig_li_16_reg_la,
+  outmig_r_16_reg_la,
+  outmig_li_r_16_reg_la,
+  type = "html",
+  title = "2016 Outmigration Rate in the LA Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (SF Bay Area)
+```{r print-metro-fixed-16-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_16_reg_sf,
+  outmig_li_16_reg_sf,
+  outmig_r_16_reg_sf,
+  outmig_li_r_16_reg_sf,
+  type = "html",
+  title = "2016 Outmigration Rate in the SF Bay Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (Fresno)
+```{r print-metro-fixed-16-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_16_reg_fresno,
+  outmig_li_16_reg_fresno,
+  outmig_r_16_reg_fresno,
+  outmig_li_r_16_reg_fresno,
+  type = "html",
+  title = "2016 Outmigration Rate in the Fresno Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-metro-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1), vars_18, 2018, LI_renters
+  )
+
+# SF Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1), vars_18, 2018, LI_renters
+  )
+
+# Fresno Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, all
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, LI
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0), vars_18, 2018, renters
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_18,
+   2018,
+   LI_renters
+  )
+```
+
+### Outmigration 2018 (LA)
+```{r print-metro-fixed-18-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_18_reg_la,
+  outmig_li_18_reg_la,
+  outmig_r_18_reg_la,
+  outmig_li_r_18_reg_la,
+  type = "html",
+  title = "2018 Outmigration Rate in the LA Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (SF Bay Area)
+```{r print-metro-fixed-18-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_18_reg_sf,
+  outmig_li_18_reg_sf,
+  outmig_r_18_reg_sf,
+  outmig_li_r_18_reg_sf,
+  type = "html",
+  title = "2018 Outmigration Rate in the SF Bay Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (Fresno)
+```{r print-metro-fixed-18-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_18_reg_fresno,
+  outmig_li_18_reg_fresno,
+  outmig_r_18_reg_fresno,
+  outmig_li_r_18_reg_fresno,
+  type = "html",
+  title = "2018 Outmigration Rate in the Fresno Area (Fixed Effects)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+## Models by investment and metropolitan area (fixed effects - Outmigration)
+```{r create-invest-metro-fixed-07, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_07,
+    2007,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_07,
+    2007,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2007 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_07,
+    2007,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_07_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_07,
+   2007,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2007 (LA)
+```{r print-invest-metro-fixed-07-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_07_reg_la,
+  outmig_li_07_reg_la,
+  outmig_r_07_reg_la,
+  outmig_li_r_07_reg_la,
+  type = "html",
+  title = "2007 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (SF Bay Area)
+```{r print-invest-metro-fixed-07-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_07_reg_sf,
+  outmig_li_07_reg_sf,
+  outmig_r_07_reg_sf,
+  outmig_li_r_07_reg_sf,
+  type = "html",
+  title = "2007 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2007 (Fresno)
+```{r print-invest-metro-fixed-07-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_07_reg_fresno,
+  outmig_li_07_reg_fresno,
+  outmig_r_07_reg_fresno,
+  outmig_li_r_07_reg_fresno,
+  type = "html",
+  title = "2007 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-fixed-10, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_10,
+    2010,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_10,
+    2010,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2010 (ACS 2010)
+## linear regression on outmigration all
+outmig_all_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_10,
+    2010,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_10_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_10,
+   2010,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2010 (LA)
+```{r print-invest-metro-fixed-10-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_10_reg_la,
+  outmig_li_10_reg_la,
+  outmig_r_10_reg_la,
+  outmig_li_r_10_reg_la,
+  type = "html",
+  title = "2010 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (SF)
+```{r print-invest-metro-fixed-10-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_10_reg_sf,
+  outmig_li_10_reg_sf,
+  outmig_r_10_reg_sf,
+  outmig_li_r_10_reg_sf,
+  type = "html",
+  title = "2010 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2010 (Fresno)
+```{r print-invest-metro-fixed-10-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_10_reg_fresno,
+  outmig_li_10_reg_fresno,
+  outmig_r_10_reg_fresno,
+  outmig_li_r_10_reg_fresno,
+  type = "html",
+  title = "2010 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-fixed-13, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2013 (ACS 2013)
+## linear regression on outmigration all
+outmig_all_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_13,
+    2013,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2013 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_13,
+    2013,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2013 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_13,
+    2013,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_13_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_13,
+   2013,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2013 (LA)
+```{r print-invest-metro-fixed-13-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_13_reg_la,
+  outmig_li_13_reg_la,
+  outmig_r_13_reg_la,
+  outmig_li_r_13_reg_la,
+  type = "html",
+  title = "2013 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (SF Bay Area)
+```{r print-invest-metro-fixed-13-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_13_reg_sf,
+  outmig_li_13_reg_sf,
+  outmig_r_13_reg_sf,
+  outmig_li_r_13_reg_sf,
+  type = "html",
+  title = "2013 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2013 (Fresno)
+```{r print-invest-metro-fixed-13-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_13_reg_fresno,
+  outmig_li_13_reg_fresno,
+  outmig_r_13_reg_fresno,
+  outmig_li_r_13_reg_fresno,
+  type = "html",
+  title = "2013 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-fixed-16, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_16,
+    2016,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_16,
+    2016,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2016 (ACS 2016)
+## linear regression on outmigration all
+outmig_all_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_16,
+    2016,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_16_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_16,
+   2016,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2016 (LA)
+```{r print-invest-metro-fixed-16-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_16_reg_la,
+  outmig_li_16_reg_la,
+  outmig_r_16_reg_la,
+  outmig_li_r_16_reg_la,
+  type = "html",
+  title = "2016 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (SF Bay Area)
+```{r print-invest-metro-fixed-16-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_16_reg_sf,
+  outmig_li_16_reg_sf,
+  outmig_r_16_reg_sf,
+  outmig_li_r_16_reg_sf,
+  type = "html",
+  title = "2016 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2016 (Fresno)
+```{r print-invest-metro-fixed-16-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_16_reg_fresno,
+  outmig_li_16_reg_fresno,
+  outmig_r_16_reg_fresno,
+  outmig_li_r_16_reg_fresno,
+  type = "html",
+  title = "2016 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+```{r create-invest-metro-fixed-18, results="asis", warning=FALSE, message=FALSE}
+# LA Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_la <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(la_flag == 1),
+    vars_18,
+    2018,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+# SF Outmigration 2018 (ACS 2018)
+## linear regression on outmigration all
+outmig_all_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_sf <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 1),
+    vars_18,
+    2018,
+    LI_renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+
+# Fresno Outmigration 2018 (ACS 2009)
+## linear regression on outmigration all
+outmig_all_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    all,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI
+outmig_li_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    LI,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration renters
+outmig_r_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+    total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+    vars_18,
+    2018,
+    renters,
+    type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+
+## linear regression on outmigration LI renters
+outmig_li_r_18_reg_fresno <-
+  outmigration_reg_full_fixed(
+   total_reg_df %>% filter(sf_flag == 0 & la_flag == 0),
+   vars_18,
+   2018,
+   LI_renters,
+   type_ivs = "greening + transit + urban_infill + active_transportation"
+  )
+```
+
+### Outmigration 2018 (LA)
+```{r print-invest-metro-fixed-18-la, results="asis", warning=FALSE, message=FALSE}
+# Print reg table LA
+stargazer::stargazer(
+  outmig_all_18_reg_la,
+  outmig_li_18_reg_la,
+  outmig_r_18_reg_la,
+  outmig_li_r_18_reg_la,
+  type = "html",
+  title = "2018 Outmigration Rate in the LA Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (SF Bay Area)
+```{r print-invest-metro-fixed-18-sf, results="asis", warning=FALSE, message=FALSE}
+# Print reg table SF
+stargazer::stargazer(
+  outmig_all_18_reg_sf,
+  outmig_li_18_reg_sf,
+  outmig_r_18_reg_sf,
+  outmig_li_r_18_reg_sf,
+  type = "html",
+  title = "2018 Outmigration Rate in the SF Bay Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```
+
+### Outmigration 2018 (Fresno)
+```{r print-invest-metro-fixed-18-fresno, results="asis", warning=FALSE, message=FALSE}
+# Print reg table Fresno
+stargazer::stargazer(
+  outmig_all_18_reg_fresno,
+  outmig_li_18_reg_fresno,
+  outmig_r_18_reg_fresno,
+  outmig_li_r_18_reg_fresno,
+  type = "html",
+  title = "2018 Outmigration Rate in the Fresno Area by Investment Type (OLS)",
+  font.size = "small",
+  column.sep.width = "1pt",
+  dep.var.labels.include = FALSE,
+  column.labels = c("ALL", "LOW INCOME", "RENTER", "LOW INCOME RENTER")
+)
+```

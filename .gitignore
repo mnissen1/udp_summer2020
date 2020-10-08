@@ -2,3 +2,12 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# ignore data
+*.csv
+sgc_data/
+infogroup/
+Spatial Data 06_26_2020/
+
+# ignore notes
+*.docx
