@@ -1838,7 +1838,7 @@ server <- function(input, output, session) {
         removeControl("outmig_r_legend") %>%
         removeControl("outmig_r_legend2") %>%
         removeControl("outmig_li_r_legend") %>%
-        removeControl("outmig_li_r_legend2")
+        removeControl("outmig_li_r_legend2") %>% 
 
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
@@ -1865,7 +1865,7 @@ server <- function(input, output, session) {
         removeControl("outmig_r_legend") %>%
         removeControl("outmig_r_legend2") %>%
         removeControl("outmig_li_r_legend") %>%
-        removeControl("outmig_li_r_legend2")
+        removeControl("outmig_li_r_legend2") %>% 
 
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
@@ -2874,9 +2874,7 @@ server <- function(input, output, session) {
         removeControl("legend_clear")
     }
   })
-
 }
 
 # Run shiny app ----------------------------------------------------------------------
 shinyApp(ui, server)
-
