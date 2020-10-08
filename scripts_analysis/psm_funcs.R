@@ -166,17 +166,17 @@ covariate_balance_plot <- function(dta_m, neighborhood_cov) {
   fun_list <- list()
   for (variable in 1:length(neighborhood_cov)) {
     fun_list[[variable]] <-
-      # if even index number remove legend
-      if (variable <= (length(neighborhood_cov) / 2)) {
+      # remove legend
+      if (variable != length(neighborhood_cov) - 2) {
         fn_bal(dta_m, neighborhood_cov[variable]) + theme(legend.position = 'none')
-        # if odd index number keep legend
+        # if 2nd to last keep legend
       } else {
         fn_bal(dta_m, neighborhood_cov[variable])
       }
   }
   
   print("Plots showing covariate balance")
-  grid.arrange(grobs = fun_list, nrow = 4, as.table = FALSE)
+  grid.arrange(grobs = fun_list, nrow = 3, ncol = 2, as.table = FALSE)
   #do.call(grid.arrange, fun_list)
   #fun_list
 }

@@ -78,11 +78,11 @@ census_data_xwalk <-
       # find value of data multiplied by weight
       ~ . * weight, 
       # attach name in the following pattern
-      .names = "{col}_00"
+      .names = "{col}_09"
     )
   ) %>% 
   # select for relevant variables (2010 tracts)
-  select(trtid10, ends_with("_00")) %>% 
+  select(trtid10, ends_with("_09")) %>% 
   # group by 2010 tracts
   group_by(trtid10) %>% 
   # sum up all variables
