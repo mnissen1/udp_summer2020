@@ -30,16 +30,27 @@ library(leaflet)
 library(shiny)
 options(tigris_use_cache = TRUE)
 
+# Directories: 
+homedir <- "E:/udp_summer2020/"
+workdir <- "sgc_data/raw/"
+savedir <- "sgc_data/cleaned/"
+spatialdir <- "Spatial Data 06_26_2020/"
+setwd(homedir)
+
 # Files and parameters --------------------------------------
 ## Matched Stats
-total_stats_geo_file <- "total_stats_geo.gpkg"
+total_stats_geo_file <- paste0(homedir, savedir, "total_stats_geo.gpkg")
 
 ## Full Area data
-full_area_info_file <- "full_area_info.gpkg"
+full_area_info_file <- paste0(homedir, savedir, "full_area_info.gpkg")
 
 ## Spatial data
-dir <- "Spatial Data 06_26_2020"
-shp_list <- list.files(dir, pattern = "\\.shp$", full.names = TRUE)
+shp_list <- 
+  list.files(
+    paste0(homedir, workdir, spatialdir),
+    pattern = "\\.shp$", 
+    full.names = TRUE
+  )
 
 ## file paths to delete (delete points if polygon version exists)
 delete_list <-
@@ -132,7 +143,7 @@ shp_list <-
   tibble(full = .) %>% 
   mutate(
     # extract just the name
-    short = str_remove(full, dir),
+    short = str_remove(full, spatialdir),
     short = str_remove(short, "/"),
     short = str_remove(short, ".shp"),
     # create flag if name is in delete list
@@ -592,8 +603,6 @@ pal_area_outmigration_li_r <-
       pull()
   )
 
-
-
 # Set leaflet overlay groups ---------------------------------------------------
 overlay_groups <-
   c(
@@ -619,234 +628,6 @@ dollar_icon <- makeAwesomeIcon(
   library = "fa",
   markerColor = "orange"
 )
-
-# Create leaflet popups---------------------------------------------------------
-# outmigration popups
-outmigration_popup <-
-  paste(
-    # Display Tract number
-    "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-    
-    # Display Average Outmigration Rates
-    "Average Total Outmigration Rate:",
-    scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
-    "Average Low Income Outmigration Rate:",
-    scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
-    "Average Renter Outmigration Rate:",
-    scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
-    "Average Low Income Renter Outmigration Rate:",
-    scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
-    
-    # Display investment flags by type
-    "Investment Type: ", 
-    case_when(
-      # all 4
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Transit, Urban Infill, Active Transportation",
-      # 3 investment types
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Transit, Urban Infill",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Transit, Active Transportation",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Urban Infill, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Transit, Urban Infill, Active Transportation",
-      # 2 investment types
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Transit",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Urban Infill",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Transit, Urban Infill",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Transit, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Urban Infill, Active Transportation",
-      # single investments
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Transit",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Urban Infill",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Active Transportation",
-      TRUE ~ "No Investments"
-    )
-  )
-
-# NOAH popups
-noah_popup <-
-  paste(
-    # Display Tract number
-    "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-    
-    # Display NOAH change
-    "% NOAH Change:", 
-    scales::percent(total_stats_geo$perc_noah_tot_change, 4), "<br>",
-    
-    # Display investment flags by type
-    "Investment Type: ", 
-    case_when(
-      # all 4
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Transit, Urban Infill, Active Transportation",
-      # 3 investment types
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Transit, Urban Infill",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Transit, Active Transportation",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Urban Infill, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Transit, Urban Infill, Active Transportation",
-      # 2 investment types
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Transit",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening, Urban Infill",
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Greening, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Transit, Urban Infill",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Transit, Active Transportation",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 1 ~
-        "Urban Infill, Active Transportation",
-      # single investments
-      total_stats_geo$greening == 1 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Greening",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 1 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 0 ~
-        "Transit",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 1 &
-        total_stats_geo$active_transportation == 0 ~
-        "Urban Infill",
-      total_stats_geo$greening == 0 &
-        total_stats_geo$transit == 0 &
-        total_stats_geo$urban_infill == 0 &
-        total_stats_geo$active_transportation == 1 ~
-        "Active Transportation",
-      TRUE ~ "No Investments"
-    )
-  )
-
-# ACS popups
-acs_popup <-
-  paste(
-    # Display Tract number
-    "Census Tract:", as.character(full_area_info$GEOID), "<br>",
-    
-    # Display non-white population
-    "Non-white Population:",
-    scales::percent(full_area_info$pct_nonwhi_09, 4), "<br>",
-    
-    # Display college educated
-    "College-Educated Population:",
-    scales::percent(full_area_info$pct_college_09, 4), "<br>",
-    
-    # Display renter occupied housing
-    "Renter-Occupied Housing:",
-    scales::percent(full_area_info$pct_h_rent_09, 4), "<br>",
-    
-    # Display median rent
-    "Median Rent:",
-    scales::dollar(full_area_info$med_rent_09, 4), "<br>",
-    
-    # Display median income
-    "Median Income:",
-    scales::dollar(full_area_info$med_inc_09, 4)
-  )
-
-
 
 # Create input selection choices ----------------------------------------------------
 # Create list of study data
@@ -1671,20 +1452,20 @@ ui <- fluidPage(
 
 # Set up server ---------------------------------------------------------------
 server <- function(input, output, session) {
-  
+
   # Set up base map ####
   output$mymap <- renderLeaflet({
     # leaflet setup
-    leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18)) %>% 
-      addTiles(options = tileOptions(minZoom = 6, maxZoom = 18)) %>% 
-      
+    leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18)) %>%
+      addTiles(options = tileOptions(minZoom = 6, maxZoom = 18)) %>%
+
       # Set Provider Tile
       addProviderTiles(
         provider = "CartoDB.Positron",
         # Set min/max zoom to focus on statewide level
         options = tileOptions(minZoom = 6, maxZoom = 18)
       ) %>%
-      
+
       # Set Maximum Bounds for California
       setMaxBounds(
         lat1 = 32.5121,
@@ -1692,7 +1473,7 @@ server <- function(input, output, session) {
         lng1 = -124.6509,
         lng2 = -114.1315
       ) %>%
-      
+
       ## Add button to set zoom level
       addEasyButton(
         easyButton(
@@ -1703,29 +1484,27 @@ server <- function(input, output, session) {
         )
       )
   })
-  
+
   # Apply area filters to study data ####
   study_data_react <- reactive({
     total_stats_geo %>% filter(location %in% input$location)
   })
-  
+
   # Apply area filters to full data ####
-  full_data_filter <- reactive({
-    full_area_info %>% filter(location %in% input$location)  
+  full_data_react <- reactive({
+    full_area_info %>% filter(location %in% input$location)
   })
-  ## Add a delay
-  full_data_react <- full_data_filter %>%  debounce(1000)
-  
+
   # Apply area filters to paired geoids ####
   paired_geoids_react <- reactive({
     paired_geoids %>% filter(location %in% input$location)
   })
-  
+
   # area filters for investment markers
   marker_react <- reactive({
     input$location
   })
-  
+
   # Disable all overlay layers if no location data selected ####
   observe({
     shinyjs::toggleState("invest_tracts", !is.null(input$location))
@@ -1733,20 +1512,20 @@ server <- function(input, output, session) {
     shinyjs::toggleState("study_data", !is.null(input$location))
     shinyjs::toggleState("full_data", !is.null(input$location))
   })
-  
+
   # Clear/reset map if no location data is selected
   observeEvent(input$location, {
     if (is.null(input$location)) {
       # Clear map if no location selected
       leafletProxy("mymap") %>%
         clearShapes() %>%
-        clearControls() %>% 
-        clearMarkerClusters() 
+        clearControls() %>%
+        clearMarkerClusters()
     } else {
       leafletProxy("mymap")
     }
   })
-  
+
   # Reset outcome inputs if no location is selected
   observe({
     if (is.null(input$location)) {
@@ -1760,7 +1539,7 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   # Reset matched inputs if no location is selected
   observe({
     if (is.null(input$location)) {
@@ -1774,14 +1553,14 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   # Reset investment checkbox if no location is selected
   observe({
     if (is.null(input$location)) {
       # Update study data button
       updateCheckboxInput(
-        session, 
-        inputId = "Investments", 
+        session,
+        inputId = "Investments",
         label = "Investment Markers",
         value = FALSE
       )
@@ -1789,14 +1568,14 @@ server <- function(input, output, session) {
       leafletProxy("mymap")
     }
   })
-  
+
   # Reset investment tracts checkbox if no location is selected
   observe({
     if (is.null(input$location)) {
       # Update study data button
       updateCheckboxInput(
-        session, 
-        inputId = "invest_tracts", 
+        session,
+        inputId = "invest_tracts",
         label = "Paired Tracts",
         value = FALSE
       )
@@ -1804,13 +1583,13 @@ server <- function(input, output, session) {
       leafletProxy("mymap")
     }
   })
-  
+
   # Disable outcome layers if matching layers selected ####
   observe({
-    # disable if no location is selected 
+    # disable if no location is selected
     if (is.null(input$location)) {
       shinyjs::disable(id = "study_data")
-      
+
     } else {
       observeEvent(input$full_data, {
         if(input$full_data == "None" & !is.null(input$location)){
@@ -1821,13 +1600,13 @@ server <- function(input, output, session) {
       })
     }
   })
-  
+
   # Disable matching layers if outcome layers selected ####
   observe({
-    # disable if no location is selected 
+    # disable if no location is selected
     if (is.null(input$location)) {
       shinyjs::disable(id = "full_data")
-      
+
     } else {
       observeEvent(input$study_data, {
         if(input$study_data == "None" & !is.null(input$location)){
@@ -1838,31 +1617,229 @@ server <- function(input, output, session) {
       })
     }
   })
-  
+
   # Add outcome data layers ####
   observe({
-    
+
     # Apply location filter
     total_stats_geo <- study_data_react()
     
+    # outmigration popups
+    outmigration_popup <-
+      paste(
+        # Display Tract number
+        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
+        
+        # Display Average Outmigration Rates
+        "Average Total Outmigration Rate:",
+        scales::percent(total_stats_geo$outmigration_all_mean, 4), "<br>",
+        "Average Low Income Outmigration Rate:",
+        scales::percent(total_stats_geo$outmigration_LI_mean, 4), "<br>",
+        "Average Renter Outmigration Rate:",
+        scales::percent(total_stats_geo$outmigration_r_mean, 4), "<br>",
+        "Average Low Income Renter Outmigration Rate:",
+        scales::percent(total_stats_geo$outmigration_LI_r_mean, 4), "<br>",
+        
+        # Display investment flags by type
+        "Investment Type: ", 
+        case_when(
+          # all 4
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Transit, Urban Infill, Active Transportation",
+          # 3 investment types
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Transit, Urban Infill",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Transit, Active Transportation",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Urban Infill, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Transit, Urban Infill, Active Transportation",
+          # 2 investment types
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Transit",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Urban Infill",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Transit, Urban Infill",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Transit, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Urban Infill, Active Transportation",
+          # single investments
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Transit",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Urban Infill",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Active Transportation",
+          TRUE ~ "No Investments"
+        )
+      )
+    
+    # NOAH popups
+    noah_popup <-
+      paste(
+        # Display Tract number
+        "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
+        
+        # Display NOAH change
+        "% NOAH Change:", 
+        scales::percent(total_stats_geo$perc_noah_tot_change, 4), "<br>",
+        
+        # Display investment flags by type
+        "Investment Type: ", 
+        case_when(
+          # all 4
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Transit, Urban Infill, Active Transportation",
+          # 3 investment types
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Transit, Urban Infill",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Transit, Active Transportation",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Urban Infill, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Transit, Urban Infill, Active Transportation",
+          # 2 investment types
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Transit",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening, Urban Infill",
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Greening, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Transit, Urban Infill",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Transit, Active Transportation",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 1 ~
+            "Urban Infill, Active Transportation",
+          # single investments
+          total_stats_geo$greening == 1 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Greening",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 1 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 0 ~
+            "Transit",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 1 &
+            total_stats_geo$active_transportation == 0 ~
+            "Urban Infill",
+          total_stats_geo$greening == 0 &
+            total_stats_geo$transit == 0 &
+            total_stats_geo$urban_infill == 0 &
+            total_stats_geo$active_transportation == 1 ~
+            "Active Transportation",
+          TRUE ~ "No Investments"
+        )
+      )
+
     # Create proxy map
     proxy <- leafletProxy("mymap")
-    
+
     #### Clear map if "None" selected ####
     if (input$study_data == "None") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
-        removeControl("outmig_li_r_legend2") %>%
-        
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
+        removeControl("outmig_li_r_legend2")
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -1873,23 +1850,23 @@ server <- function(input, output, session) {
             outmig_li_r_clear
           )
         )
-    } 
-    
+    }
+
     #### Add NOAH layers ####
     else if (input$study_data == "NOAH") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
-        removeControl("outmig_li_r_legend2") %>%
-        
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
+        removeControl("outmig_li_r_legend2")
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -1899,8 +1876,8 @@ server <- function(input, output, session) {
             outmig_r_clear,
             outmig_li_r_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## add NOAH % change in study areas polygon ##################
       addPolygons(
         data = total_stats_geo,
@@ -1916,23 +1893,23 @@ server <- function(input, output, session) {
         # assign layerId
         layerId = noah_clear,
         # bring shape to front on hover
-        highlightOptions = 
+        highlightOptions =
           highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add average area NOAH legend###################
       addLegend(
         # add color scheme
         pal = pal_area_noah,
         # set position
         "bottomleft",
-        # set values 
-        values = 
+        # set values
+        values =
           unite(
             total_stats_geo %>%
               group_by(location) %>%
               summarise(
-                noah_change = 
+                noah_change =
                   scales::percent(
                     mean(perc_noah_tot_change, na.rm = TRUE), 4
                   )
@@ -1941,11 +1918,11 @@ server <- function(input, output, session) {
             location,
             noah_change,
             sep = ": "
-          ) %>% 
-          st_drop_geometry() %>% 
+          ) %>%
+          st_drop_geometry() %>%
           mutate(
             location_change = str_replace(location_change, "_", " ")
-          ) %>% 
+          ) %>%
           pull(),
         title = "Average NOAH Change Rate </br> 2009 - 2016",
         opacity = 1,
@@ -1953,39 +1930,39 @@ server <- function(input, output, session) {
         group = "NOAH Study Areas",
         # set LayerId
         layerId = "noah_legend_clear"
-      ) %>% 
-        
+      ) %>%
+
         ## Add NOAH legend ####
       addLegend(
         "bottomleft",
         pal = pal_noah,
         values = full_area_info$perc_noah_tot_change,
         title = "NOAH Change Rate</br>2009 - 2016",
-        labFormat = 
+        labFormat =
           function(type, cuts, p) {  # Here's the trick
             paste0(noah_labs)
           },
         opacity = 1,
         group = "NOAH Study Areas",
         layerId = "noah_legend_clear2"
-      ) 
+      )
     }
-    
+
     ## Add Outmigration All layers ####
     else if (input$study_data == "Total Outmigration") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
         removeControl("outmig_li_r_legend2") %>%
-        
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -1995,8 +1972,8 @@ server <- function(input, output, session) {
             outmig_r_clear,
             outmig_li_r_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## add Total Outmigration study areas polygon ####################
       addPolygons(
         # set outmigration data
@@ -2013,33 +1990,33 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add average area outmigration all legend###################
       addLegend(
         pal = pal_area_outmigration_all,
         "bottomleft",
-        values = 
+        values =
           unite(
             total_stats_geo %>%
               group_by(location) %>%
               summarise(
-                outmig_change = 
+                outmig_change =
                   scales::percent(mean(outmigration_all_mean, na.rm = TRUE), 4)
               ),
             "location_change",
             location,
             outmig_change,
             sep = ": "
-          ) %>% 
-          st_drop_geometry() %>% 
-          mutate(location_change = str_replace(location_change, "_", " ")) %>% 
+          ) %>%
+          st_drop_geometry() %>%
+          mutate(location_change = str_replace(location_change, "_", " ")) %>%
           pull(),
         title = "Average Rate of Total Outmigration</br>2007 - 2018",
         opacity = 1,
         group = "Outmigration All Study Areas",
         layerId = "outmig_all_legend"
       ) %>%
-        
+
         ## Add Outmigration All legend ####################################
       addLegend(
         "bottomleft",
@@ -2053,24 +2030,24 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "Outmigration All Study Areas",
         layerId = "outmig_all_legend2"
-      ) 
+      )
     }
-    
+
     ## Add Outmigration LI layers ####
     else if (input$study_data == "Low Income Outmigration") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
         removeControl("outmig_li_r_legend2") %>%
-        
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2080,8 +2057,8 @@ server <- function(input, output, session) {
             outmig_r_clear,
             outmig_li_r_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## add LI Outmigration study areas polygon #########################
       addPolygons(
         # set outmigration data
@@ -2097,34 +2074,34 @@ server <- function(input, output, session) {
         layerId = outmig_li_clear,
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
-      ) %>% 
-        
+      ) %>%
+
         ## Add average area outmigration LI legend###################
       addLegend(
         pal = pal_area_outmigration_li,
         "bottomleft",
-        values = 
+        values =
           unite(
             total_stats_geo %>%
               group_by(location) %>%
               summarise(
-                outmig_change = 
+                outmig_change =
                   scales::percent(mean(outmigration_LI_mean, na.rm = TRUE), 4)
               ),
             "location_change",
             location,
             outmig_change,
             sep = ": "
-          ) %>% 
-          st_drop_geometry() %>% 
-          mutate(location_change = str_replace(location_change, "_", " ")) %>% 
+          ) %>%
+          st_drop_geometry() %>%
+          mutate(location_change = str_replace(location_change, "_", " ")) %>%
           pull(),
         title = "Average Rate of Low Income Outmigration</br>2007 - 2018",
         opacity = 1,
         group = "Outmigration LI Study Areas",
         layerId = "outmig_li_legend"
       ) %>%
-        
+
         ## Add Outmigration LI legend ##################################
       addLegend(
         "bottomleft",
@@ -2138,24 +2115,24 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "Outmigration LI Study Areas",
         layerId = "outmig_li_legend2"
-      ) 
+      )
     }
-    
+
     ## Add Outmigration Renters Layers ####
     else if (input$study_data == "Renter Outmigration") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
         removeControl("outmig_li_r_legend2") %>%
-        
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2165,8 +2142,8 @@ server <- function(input, output, session) {
             outmig_r_clear,
             outmig_li_r_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## add Renter Outmigration study areas polygon ####################
       addPolygons(
         # set outmigration data
@@ -2183,33 +2160,33 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add average area outmigration renter legend###################
       addLegend(
         pal = pal_area_outmigration_r,
         "bottomleft",
-        values = 
+        values =
           unite(
             total_stats_geo %>%
               group_by(location) %>%
               summarise(
-                outmig_change = 
+                outmig_change =
                   scales::percent(mean(outmigration_r_mean, na.rm = TRUE), 4)
               ),
             "location_change",
             location,
             outmig_change,
             sep = ": "
-          ) %>% 
-          st_drop_geometry() %>% 
-          mutate(location_change = str_replace(location_change, "_", " ")) %>% 
+          ) %>%
+          st_drop_geometry() %>%
+          mutate(location_change = str_replace(location_change, "_", " ")) %>%
           pull(),
         title = "Average Rate of Renter Outmigration</br>2007 - 2018",
         opacity = 1,
         group = "Outmigration Renter Study Areas",
         layerId = "outmig_r_legend"
       ) %>%
-        
+
         ## Add Outmigration Renter legend ###################################
       addLegend(
         "bottomleft",
@@ -2223,24 +2200,24 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "Outmigration Renter Study Areas",
         layerId = "outmig_r_legend2"
-      ) 
+      )
     }
-    
+
     ## Add Outmigration Low Income Renters Layers ####
     else if (input$study_data == "Low Income Renter Outmigration") {
       proxy %>%
         # Reset controls (need to do one by one)
-        removeControl("noah_legend_clear") %>% 
-        removeControl("noah_legend_clear2") %>% 
-        removeControl("outmig_all_legend") %>% 
-        removeControl("outmig_all_legend2") %>% 
-        removeControl("outmig_li_legend") %>% 
-        removeControl("outmig_li_legend2") %>% 
-        removeControl("outmig_r_legend") %>% 
-        removeControl("outmig_r_legend2") %>% 
-        removeControl("outmig_li_r_legend") %>% 
+        removeControl("noah_legend_clear") %>%
+        removeControl("noah_legend_clear2") %>%
+        removeControl("outmig_all_legend") %>%
+        removeControl("outmig_all_legend2") %>%
+        removeControl("outmig_li_legend") %>%
+        removeControl("outmig_li_legend2") %>%
+        removeControl("outmig_r_legend") %>%
+        removeControl("outmig_r_legend2") %>%
+        removeControl("outmig_li_r_legend") %>%
         removeControl("outmig_li_r_legend2") %>%
-        
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2250,8 +2227,8 @@ server <- function(input, output, session) {
             outmig_r_clear,
             outmig_li_r_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## add LI Renter Outmigration study areas polygon ######################
       addPolygons(
         # set outmigration data
@@ -2268,33 +2245,33 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add average area outmigration LI renter legend###################
       addLegend(
         pal = pal_area_outmigration_li_r,
         "bottomleft",
-        values = 
+        values =
           unite(
             total_stats_geo %>%
               group_by(location) %>%
               summarise(
-                outmig_change = 
+                outmig_change =
                   scales::percent(mean(outmigration_LI_r_mean, na.rm = TRUE), 4)
               ),
             "location_change",
             location,
             outmig_change,
             sep = ": "
-          ) %>% 
-          st_drop_geometry() %>% 
-          mutate(location_change = str_replace(location_change, "_", " ")) %>% 
+          ) %>%
+          st_drop_geometry() %>%
+          mutate(location_change = str_replace(location_change, "_", " ")) %>%
           pull(),
         title = "Average Rate of Low Income Renter Outmigration</br>2007 - 2018",
         opacity = 1,
         group = "Outmigration LI Renter Study Areas",
         layerId = "outmig_li_r_legend"
       ) %>%
-        
+
         ## Add Outmigration LI Renter legend #####################################
       addLegend(
         "bottomleft",
@@ -2308,26 +2285,53 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "Outmigration LI Renter Study Areas",
         layerId = "outmig_li_r_legend2"
-      ) 
+      )
     }
   })
-  
+
   # Add matching data layers ####
   observe({
-    
+
     # Apply location filter
     full_area_info <- full_data_react()
     
+    # ACS popups
+    acs_popup <-
+      paste(
+        # Display Tract number
+        "Census Tract:", as.character(full_area_info$GEOID), "<br>",
+        
+        # Display non-white population
+        "Non-white Population:",
+        scales::percent(full_area_info$pct_nonwhi_09, 4), "<br>",
+        
+        # Display college educated
+        "College-Educated Population:",
+        scales::percent(full_area_info$pct_college_09, 4), "<br>",
+        
+        # Display renter occupied housing
+        "Renter-Occupied Housing:",
+        scales::percent(full_area_info$pct_h_rent_09, 4), "<br>",
+        
+        # Display median rent
+        "Median Rent:",
+        scales::dollar(full_area_info$med_rent_09, 4), "<br>",
+        
+        # Display median income
+        "Median Income:",
+        scales::dollar(full_area_info$med_inc_09, 4)
+      )
+
     #### Clear map if "None" selected ####
     if (input$full_data == "None") {
-      leafletProxy("mymap") %>% 
+      leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2338,18 +2342,18 @@ server <- function(input, output, session) {
             med_inc_clear
           )
         )
-    } 
-    
+    }
+
     #### Add Non-white pop layers ####
     else if (input$full_data == "Non-white Population") {
       leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2359,8 +2363,8 @@ server <- function(input, output, session) {
             med_rent_clear,
             med_inc_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## Add Non-white population ##############################
       addPolygons(
         # set population data
@@ -2376,8 +2380,8 @@ server <- function(input, output, session) {
         layerId = nw_clear,
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
-      ) %>% 
-        
+      ) %>%
+
         ## Add Non-white population legend ###############################
       addLegend(
         "bottomleft",
@@ -2393,17 +2397,17 @@ server <- function(input, output, session) {
         layerId = "nw_legend"
       )
     }
-    
+
     #### Add college educated pop layers ####
     else if (input$full_data == "College Educated Population") {
       leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2413,8 +2417,8 @@ server <- function(input, output, session) {
             med_rent_clear,
             med_inc_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## Add College population #############################
       addPolygons(
         # set population data
@@ -2431,7 +2435,7 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add college population legend ################################
       addLegend(
         "bottomleft",
@@ -2445,19 +2449,19 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "College Educated Population",
         layerId = "college_legend"
-      ) 
+      )
     }
-    
+
     #### Add renter occupied housing layers ####
     else if (input$full_data == "Renter-Occupied Housing") {
       leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2467,8 +2471,8 @@ server <- function(input, output, session) {
             med_rent_clear,
             med_inc_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## Add renter-occupied housing ##########################
       addPolygons(
         # set population data
@@ -2485,7 +2489,7 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add renter occupied legend ###############################
       addLegend(
         "bottomleft",
@@ -2501,17 +2505,17 @@ server <- function(input, output, session) {
         layerId = "renter_legend"
       )
     }
-    
+
     #### Add median rent layers ####
     else if (input$full_data == "Median Rent") {
       leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2521,8 +2525,8 @@ server <- function(input, output, session) {
             med_rent_clear,
             med_inc_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## Add median rent ##################################
       addPolygons(
         # set population data
@@ -2539,7 +2543,7 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add median rent legend ##################################
       addLegend(
         "bottomleft",
@@ -2553,19 +2557,19 @@ server <- function(input, output, session) {
         opacity = 1,
         group = "Median Rent",
         layerId = "med_rent_legend"
-      ) 
+      )
     }
-    
+
     #### Add median income layers ####
     else if (input$full_data == "Median Income") {
       leafletProxy("mymap") %>%
         # Reset controls (need to do one by one)
-        removeControl("nw_legend") %>% 
-        removeControl("college_legend") %>% 
-        removeControl("renter_legend") %>% 
-        removeControl("med_rent_legend") %>% 
-        removeControl("med_inc_legend") %>% 
-        
+        removeControl("nw_legend") %>%
+        removeControl("college_legend") %>%
+        removeControl("renter_legend") %>%
+        removeControl("med_rent_legend") %>%
+        removeControl("med_inc_legend") %>%
+
         # Reset shapes (remove NOAH/Outmigration variants)
         removeShape(
           c(
@@ -2575,8 +2579,8 @@ server <- function(input, output, session) {
             med_rent_clear,
             med_inc_clear
           )
-        ) %>% 
-        
+        ) %>%
+
         ## Add median income ##############################
       addPolygons(
         # set population data
@@ -2593,7 +2597,7 @@ server <- function(input, output, session) {
         # bring shape to front on hover
         highlightOptions = highlightOptions(opacity = 0, bringToFront = FALSE)
       ) %>%
-        
+
         ## Add median income legend ##################################
       addLegend(
         "bottomleft",
@@ -2610,13 +2614,13 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   # Add investment marker checkbox ####
   observe({
     # Create proxy map
     proxy <- leafletProxy("mymap")
     #marker_area <- marker_react()
-    
+
     if (input$Investments) {
       # filter by location
       ## ALL locations
@@ -2624,97 +2628,97 @@ server <- function(input, output, session) {
         proxy %>%
           clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add SF
           sf_markers() %>%
           #add Fresno
           fresno_markers() %>%
           # add LA
           la_markers()
-        
+
         ## JUST SF AND FRESNO
       } else if (setequal(marker_react(), c("SF_Bay", "Fresno"))) {
         proxy %>%
           clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add SF
           sf_markers() %>%
           #add Fresno
           fresno_markers()
-        
+
         ## JUST SF AND LA
       } else if (setequal(marker_react(), c("SF_Bay", "LA"))) {
         proxy %>%
           clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add SF
           sf_markers() %>%
           # add LA
           la_markers()
-        
+
         ## JUST FRESNO AND LA
       } else if (setequal(marker_react(), c("Fresno", "LA"))) {
         proxy %>%
           clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add Fresno
           fresno_markers() %>%
           # add LA
           la_markers()
-        
+
         ## JUST SF
       } else if (setequal(marker_react(), "SF_Bay")) {
         proxy %>%
-          clearMarkerClusters() %>% 
+          clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add SF
           sf_markers()
-        
+
         ## JUST FRESNO
       } else if (setequal(marker_react(), "Fresno")) {
         proxy %>%
-          clearMarkerClusters() %>% 
+          clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add Fresno
           fresno_markers()
-        
+
         ## JUST LA
       } else if (setequal(marker_react(), "LA")) {
         proxy %>%
-          clearMarkerClusters() %>% 
+          clearMarkerClusters() %>%
           removeShape(invest_list) %>%
-          
+
           # add LA
           la_markers()
       }
     }
-    
+
     else {
       leafletProxy("mymap") %>%
         clearMarkerClusters() %>%
         removeShape(invest_list)
     }
-    
+
   })
-  
-  
+
+
   # Add investment tract checkbox ####
   observe({
     # Apply location filter
     paired_geoids <- paired_geoids_react()
     total_stats_geo <- study_data_react()
-    
+
     # Create proxy map
     proxy <- leafletProxy("mymap")
-    
+
     if (input$invest_tracts) {
       proxy %>%
-        
+
         ## add investment boundaries ###############################
       addPolylines(
         data = total_stats_geo,
@@ -2731,7 +2735,7 @@ server <- function(input, output, session) {
           paste(
             # add tract's GEOID
             "Census Tract:", as.character(total_stats_geo$GEOID), "<br>",
-            
+
             # Display investment flags by type
             "Investment Type: ",
             case_when(
@@ -2846,7 +2850,7 @@ server <- function(input, output, session) {
             bringToFront = TRUE
           )
         ) %>%
-        
+
         ## Add Investment Flag legend #####
       addLegend(
         "bottomright",
@@ -2862,17 +2866,16 @@ server <- function(input, output, session) {
         group = "invest_tracts"
       )
     }
-    
+
     else {
       proxy %>%
         removeShape(tract_clear) %>%
-        removeShape(tract_pair_clear) %>% 
+        removeShape(tract_pair_clear) %>%
         removeControl("legend_clear")
     }
   })
-  
-}
 
+}
 
 # Run shiny app ----------------------------------------------------------------------
 shinyApp(ui, server)
