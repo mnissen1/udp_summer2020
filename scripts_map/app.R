@@ -1,3 +1,25 @@
+# -------------------------------------------------------------------------
+# Created by: Matt Alvarez-Nissen                         
+# Date created: Sept. 11, 2020                
+# Last revised: Oct. 8, 2020                 
+# Project: UDP SGC     
+# Subproject: Shiny Map
+# Re: Create Shiny App
+# -------------------------------------------------------------------------
+
+# Script Description ------------------------------------------------------
+
+# This script creates a Shiny app using cleaned data from map_clean.R.
+
+# Inputs:
+# Full area and study area geopackages
+
+# Outputs:
+# Shiny app (Leaflet map)
+
+# Update log: 
+# 10/8/20 - added script header
+
 # Open libraries---------------------------------------------
 library(tidyverse)
 library(sf)
