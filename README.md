@@ -24,6 +24,8 @@ There are both OLS and fixed effects models in the writeup, and at various geogr
 # Map
 An interactive geospatial representation of the matching process and results is produced as a Shiny app using Leaflet. The code to produce the Shiny app is available in this repo, and the app itself can be accessed [here](https://matt-nissen.shinyapps.io/SGC_Matched_Neighborhoods_Map/?_ga=2.46349092.2031182488.1602192102-2050714689.1599855133).
 
+![Map Screenshot](https://github.com/mnissen1/udp_summer2020/blob/master/visualizations/map_screenshot.png)
+
 # Credits
 * R packages used in PSM: `tidyverse`, `MatchIt`, `gridExtra`, `tableone`, `broom`, `infer`, `glue`, `tidycensus`, `tigris`, `sf`, `knitr`, `leaps`, `kableExtra`, `gridExtra`, `magick`
 * R packages used in regressions: `tidyverse`, `glue`, `stargazer`
