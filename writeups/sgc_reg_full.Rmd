@@ -1,7 +1,7 @@
 ---
 title: "SGC Full Regressions"
 author: "Matt Alvarez-Nissen"
-date: "9/6/2020"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
   html_document:
     toc: true
@@ -13,19 +13,27 @@ knitr::opts_chunk$set(echo = FALSE, results = "asis", message = FALSE, warning =
 ```
 
 ```{r read-libraries-parameters, message=FALSE, warning=FALSE}
+# Libraries
 library(tidyverse)
 library(glue)
 
+# Directories: 
+homedir <- "E:/udp_summer2020/"
+workdir <- "sgc_data/raw/"
+savedir <- "sgc_data/cleaned/"
+
 # Files
 ## PSM results
-total_stats_all_file <- "./SGC/total_stats_all.csv"
+total_stats_all_file <- 
+  paste0(homedir, savedir, "writeup_results/total_stats_all.csv")
 
 ## ACS
-all_years_tract_ca_file <- "./SGC/tract characteristics/all_years_tract_CA.csv"
+all_years_tract_ca_file <- paste0(homedir, savedir, "all_years_tract_CA.csv")
 
 ## NOAH 
-noah_00_file <- "./SGC/NOAH_SGC_2000.csv"
-crosswalk_00_10_file <- "./SGC/crosswalk_2000_2010.csv"
+noah_00_file <- paste0(homedir, workdir, "NOAH_SGC_2000.csv")
+
+crosswalk_00_10_file <- paste0(homedir, workdir, "crosswalk_2000_2010.csv")
 ```
 
 ```{r read-noah-2000, echo= FALSE, warning=FALSE, message=FALSE}
@@ -97,7 +105,7 @@ noah_00_xwalk <-
 ```
 
 ```{r write-noah-2000-xwalk}
-noah_00_xwalk %>% write_csv("./SGC/NOAH_SGC_2000_xwalk.csv")
+noah_00_xwalk %>% write_csv(paste0(homedir, savedir, "NOAH_SGC_2000_xwalk.csv"))
 ```
 
 ```{r read-psm-results}
