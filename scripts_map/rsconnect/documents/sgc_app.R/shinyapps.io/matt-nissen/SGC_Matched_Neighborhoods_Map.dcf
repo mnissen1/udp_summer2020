@@ -1,0 +1,12 @@
+name: SGC_Matched_Neighborhoods_Map
+title: SGC_Matched_Neighborhoods_Map
+username:
+account: matt-nissen
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2974836
+bundleId: 3718632
+url: https://matt-nissen.shinyapps.io/SGC_Matched_Neighborhoods_Map/
+when: 1602192868.91796
+asMultiple: FALSE
+asStatic: FALSE

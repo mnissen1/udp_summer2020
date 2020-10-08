@@ -31,24 +31,17 @@ library(shiny)
 library(shinycssloaders)
 options(tigris_use_cache = TRUE)
 
-# Directories: 
-homedir <- "E:/udp_summer2020/"
-workdir <- "sgc_data/raw/"
-savedir <- "sgc_data/cleaned/"
-spatialdir <- "Spatial Data 06_26_2020/"
-setwd(homedir)
-
 # Files and parameters --------------------------------------
 ## Matched Stats
-total_stats_geo_file <- paste0(homedir, savedir, "total_stats_geo.gpkg")
+total_stats_geo_file <- "total_stats_geo.gpkg"
 
 ## Full Area data
-full_area_info_file <- paste0(homedir, savedir, "full_area_info.gpkg")
+full_area_info_file <- "full_area_info.gpkg"
 
 ## Spatial data
 shp_list <- 
   list.files(
-    paste0(homedir, workdir, spatialdir),
+    "Spatial Data 06_26_2020",
     pattern = "\\.shp$", 
     full.names = TRUE
   )
@@ -144,7 +137,7 @@ shp_list <-
   tibble(full = .) %>% 
   mutate(
     # extract just the name
-    short = str_remove(full, paste0(homedir, workdir, spatialdir)),
+    short = str_remove(full, "Spatial Data 06_26_2020"),
     short = str_remove(short, "/"),
     short = str_remove(short, ".shp"),
     # create flag if name is in delete list
@@ -1885,7 +1878,7 @@ server <- function(input, output, session) {
         popup = noah_popup,
         # set fill colors and settings
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_noah(perc_noah_tot_change),
         # assign group
@@ -1894,7 +1887,7 @@ server <- function(input, output, session) {
         layerId = noah_clear,
         # bring shape to front on hover
         highlightOptions =
-          highlightOptions(opacity = .7, bringToFront = FALSE)
+          highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add average area NOAH legend###################
@@ -1982,13 +1975,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = outmigration_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_outmig_all(outmigration_all_mean),
         group = "Outmigration All Study Areas",
         layerId = outmig_all_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration all legend###################
@@ -2067,13 +2060,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = outmigration_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_outmig_all(outmigration_LI_mean),
         group = "Outmigration LI Study Areas",
         layerId = outmig_li_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration LI legend###################
@@ -2152,13 +2145,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = outmigration_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_outmig_all(outmigration_r_mean),
         group = "Outmigration Renter Study Areas",
         layerId = outmig_r_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration renter legend###################
@@ -2237,13 +2230,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = outmigration_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_outmig_all(outmigration_LI_r_mean),
         group = "Outmigration LI Renter Study Areas",
         layerId = outmig_li_r_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add average area outmigration LI renter legend###################
@@ -2373,13 +2366,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = acs_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_nonwhi(pct_nonwhi_09),
         group = "Non-white Population",
         layerId = nw_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add Non-white population legend ###############################
@@ -2427,13 +2420,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = acs_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_college(pct_college_09),
         group = "College Educated Population",
         layerId = college_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add college population legend ################################
@@ -2481,13 +2474,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = acs_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_renter(pct_h_rent_09),
         group = "Renter-Occupied Housing",
         layerId = renter_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add renter occupied legend ###############################
@@ -2535,13 +2528,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = acs_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_medrent(med_rent_09),
         group = "Median Rent",
         layerId = med_rent_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add median rent legend ##################################
@@ -2589,13 +2582,13 @@ server <- function(input, output, session) {
         # Set GEOID names and NOAH percentages
         popup = acs_popup,
         smoothFactor = 0,
-        fillOpacity = .7,
+        fillOpacity = 1,
         weight = 0,
         color = ~pal_medinc(med_inc_09),
         group = "Median Income",
         layerId = med_inc_clear,
         # bring shape to front on hover
-        highlightOptions = highlightOptions(opacity = .7, bringToFront = FALSE)
+        highlightOptions = highlightOptions(opacity = 1, bringToFront = FALSE)
       ) %>%
 
         ## Add median income legend ##################################
