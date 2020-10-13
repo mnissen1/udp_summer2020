@@ -8,7 +8,7 @@ My work for UDP contributed to their project with the [Strategic Growth Council]
 I was responsible for matching neighborhoods with investments to neighborhoods without investments, in order to appropriately study the impact of climate change mitigation investments. This process made use of the propensity score matching technique and studied outcomes with both full OLS regressions and fixed effects regressions. Finally, I also produced an interactive map demonstrating the selection process and visualizing the outcomes. Impacts were approximated using outmigration measures from InfoGroup (now [Data Axle](https://www.data-axle.com/)) and UDP's Naturally Occuring Affordable Housing (NOAH) dataset.
 
 # Propensity Score Matching
-The results of the propensity score matching (PSM) can be found [here](https://github.com/mnissen1/udp_summer2020/tree/master/writeups/sgc_psm_writeup.pdf).
+The results of the propensity score matching (PSM) can be found [here](https://github.com/mnissen1/udp_summer2020/tree/master/writeups/sgc_psm_report.pdf).
 
 PSM is a statistical matching technique that matches control and treatment observations based on similar "propensity scores", which is a balancing score derived from selected covariates. Covariates in this case were selected after running through the process multiple times and selecting the grouping with the lowest Average Absolute Standardized Difference. Goodness-of-fit for these results can be seen [here](https://github.com/mnissen1/udp_summer2020/tree/master/visualizations/psm_tests).
 
