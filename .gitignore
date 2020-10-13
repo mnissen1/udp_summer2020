@@ -12,3 +12,8 @@ Spatial Data 06_26_2020/
 
 # ignore notes
 *.docx
+
+# ignore old writeups
+writeups/sgc_psm_writeup.Rmd
+writeups/sgc_psm_writeup.txt
+writeups/sgc_psm_writeup.pdf
